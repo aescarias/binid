@@ -241,4 +241,30 @@ var MagicTags = []Tag{
 		Mime:     "application/vnd.sqlite3",
 		Narrower: NarrowMagic([]byte("SQLite format 3\x00"), 0),
 	},
+	{
+		Name:      "Paint.NET image file",
+		Mime:      "image/x-paintnet",
+		Narrower:  NarrowMagic([]byte("PDN3"), 0),
+		Extractor: formats.ParsePDN,
+	},
+	{
+		Name:     "PostScript file version 3.0",
+		Mime:     "application/postscript",
+		Narrower: NarrowMagic([]byte("%!PS-Adobe-3.0"), 0),
+	},
+	{
+		Name:     "Rich Text Format file",
+		Mime:     "application/rtf",
+		Narrower: NarrowMagic([]byte("{\\rtf1"), 0),
+	},
+	{
+		Name:     "Web Open Font Format (WOFF) v1.0",
+		Mime:     "font/woff",
+		Narrower: NarrowMagic([]byte("wOFF"), 0),
+	},
+	{
+		Name:     "Web Open Font Format (WOFF) v2.0",
+		Mime:     "font/woff2",
+		Narrower: NarrowMagic([]byte("wOF2"), 0),
+	},
 }

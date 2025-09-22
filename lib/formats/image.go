@@ -2,9 +2,47 @@ package formats
 
 import (
 	"encoding/binary"
+	"encoding/xml"
 	"fmt"
 	"io"
 )
+
+type PDNHeader struct {
+	Width   int    `xml:"width,attr"`
+	Height  int    `xml:"height,attr"`
+	Layers  int    `xml:"layers,attr"`
+	Version string `xml:"savedWithVersion,attr"`
+}
+
+func ParsePDN(reader io.ReadSeeker) (map[string]any, error) {
+	if _, err := reader.Seek(4, 0); err != nil {
+		return nil, err
+	}
+
+	headerSizeBytes := make([]byte, 4)
+	if _, err := reader.Read(headerSizeBytes[0:3]); err != nil {
+		return nil, err
+	}
+	headerSizeBytes[3] = 0
+
+	headerSize := binary.LittleEndian.Uint32(headerSizeBytes)
+
+	headerBytes := make([]byte, headerSize)
+	if _, err := reader.Read(headerBytes); err != nil {
+		return nil, err
+	}
+
+	var pdn PDNHeader
+	if err := xml.Unmarshal(headerBytes, &pdn); err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"size":               fmt.Sprintf("%dx%d pixels", pdn.Width, pdn.Height),
+		"layers":             pdn.Layers,
+		"saved with version": pdn.Version,
+	}, nil
+}
 
 /* ParseICO extracts information from a Windows icon (.ico) file. */
 func ParseICO(reader io.ReadSeeker) (map[string]any, error) {
