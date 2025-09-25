@@ -141,18 +141,18 @@ type Token struct {
 	Value string
 }
 
-type Parser struct {
+type Lexer struct {
 	Contents Scanner
 	Tokens   []Token
 }
 
-func (p *Parser) LexNumeric() Token {
-	digits := []byte{p.Contents.Cursor()}
-	p.Contents.Advance(1)
+func (lx *Lexer) LexNumeric() Token {
+	digits := []byte{lx.Contents.Cursor()}
+	lx.Contents.Advance(1)
 
-	for !p.Contents.IsDone() && (IsASCIIDigit(p.Contents.Cursor()) || p.Contents.Cursor() == '.') {
-		digits = append(digits, p.Contents.Cursor())
-		p.Contents.Advance(1)
+	for !lx.Contents.IsDone() && (IsASCIIDigit(lx.Contents.Cursor()) || lx.Contents.Cursor() == '.') {
+		digits = append(digits, lx.Contents.Cursor())
+		lx.Contents.Advance(1)
 	}
 
 	if bytes.Contains(digits, []byte{'.'}) {
@@ -162,13 +162,13 @@ func (p *Parser) LexNumeric() Token {
 	}
 }
 
-func (p *Parser) LexIdentifier() Token {
-	ident := []byte{p.Contents.Cursor()}
-	p.Contents.Advance(1)
+func (lx *Lexer) LexIdentifier() Token {
+	ident := []byte{lx.Contents.Cursor()}
+	lx.Contents.Advance(1)
 
-	for !p.Contents.IsDone() && IsIdentifier(p.Contents.Cursor()) {
-		ident = append(ident, p.Contents.Cursor())
-		p.Contents.Advance(1)
+	for !lx.Contents.IsDone() && IsIdentifier(lx.Contents.Cursor()) {
+		ident = append(ident, lx.Contents.Cursor())
+		lx.Contents.Advance(1)
 	}
 
 	if slices.Contains([]string{"and", "or", "true", "false"}, string(ident)) {
@@ -178,128 +178,128 @@ func (p *Parser) LexIdentifier() Token {
 	}
 }
 
-func (p *Parser) LexString(delimiter byte) Token {
+func (lx *Lexer) LexString(delimiter byte) Token {
 	strSeq := []byte{}
-	p.Contents.Advance(1) // for the single-byte start quote
+	lx.Contents.Advance(1) // for the single-byte start quote
 
-	for !p.Contents.IsDone() {
-		cur := p.Contents.Cursor()
+	for !lx.Contents.IsDone() {
+		cur := lx.Contents.Cursor()
 		if cur == delimiter {
-			p.Contents.Advance(1)
+			lx.Contents.Advance(1)
 			break
 		}
 
 		strSeq = append(strSeq, cur)
-		p.Contents.Advance(1)
+		lx.Contents.Advance(1)
 	}
 
 	return Token{Kind: TokenString, Value: string(strSeq)}
 }
 
-func (p *Parser) Process() {
-	for !p.Contents.IsDone() {
-		ch := p.Contents.Cursor()
+func (lx *Lexer) Process() {
+	for !lx.Contents.IsDone() {
+		ch := lx.Contents.Cursor()
 
 		switch ch {
 		case '(':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenLParen, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLParen, Value: string(ch)})
 		case ')':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenRParen, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenRParen, Value: string(ch)})
 		case '[':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenLBracket, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLBracket, Value: string(ch)})
 		case ']':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenRBracket, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenRBracket, Value: string(ch)})
 		case ',':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenComma, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenComma, Value: string(ch)})
 		case ':':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenColon, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenColon, Value: string(ch)})
 		case '@':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenAt, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenAt, Value: string(ch)})
 		case '=':
-			switch nc := p.Contents.Peek(1); nc {
+			switch nc := lx.Contents.Peek(1); nc {
 			case "=":
-				p.Tokens = append(p.Tokens, Token{Kind: TokenEquals, Value: string(ch) + nc})
-				p.Contents.Advance(1)
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenEquals, Value: string(ch) + nc})
+				lx.Contents.Advance(1)
 			default:
-				p.Tokens = append(p.Tokens, Token{Kind: TokenAssign, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenAssign, Value: string(ch)})
 			}
 		case '>':
-			switch nc := p.Contents.Peek(1); nc {
+			switch nc := lx.Contents.Peek(1); nc {
 			case "=":
-				p.Tokens = append(p.Tokens, Token{Kind: TokenGtEq, Value: string(ch) + nc})
-				p.Contents.Advance(1)
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenGtEq, Value: string(ch) + nc})
+				lx.Contents.Advance(1)
 			case ">":
-				p.Tokens = append(p.Tokens, Token{Kind: TokenBitwiseRight, Value: string(ch) + nc})
-				p.Contents.Advance(1)
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseRight, Value: string(ch) + nc})
+				lx.Contents.Advance(1)
 			default:
-				p.Tokens = append(p.Tokens, Token{Kind: TokenGt, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenGt, Value: string(ch)})
 			}
 		case '<':
-			switch nc := p.Contents.Peek(1); nc {
+			switch nc := lx.Contents.Peek(1); nc {
 			case "=":
-				p.Tokens = append(p.Tokens, Token{Kind: TokenLtEq, Value: string(ch) + nc})
-				p.Contents.Advance(1)
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenLtEq, Value: string(ch) + nc})
+				lx.Contents.Advance(1)
 			case "<":
-				p.Tokens = append(p.Tokens, Token{Kind: TokenBitwiseLeft, Value: string(ch) + nc})
-				p.Contents.Advance(1)
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseLeft, Value: string(ch) + nc})
+				lx.Contents.Advance(1)
 			default:
-				p.Tokens = append(p.Tokens, Token{Kind: TokenLt, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenLt, Value: string(ch)})
 			}
 		case '+':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenPlus, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenPlus, Value: string(ch)})
 		case '-':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenMinus, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenMinus, Value: string(ch)})
 		case '/':
-			switch nc := p.Contents.Peek(1); nc {
+			switch nc := lx.Contents.Peek(1); nc {
 			case "/":
-				for !p.Contents.IsDone() && p.Contents.Cursor() != '\n' {
-					p.Contents.Advance(1)
+				for !lx.Contents.IsDone() && lx.Contents.Cursor() != '\n' {
+					lx.Contents.Advance(1)
 				}
 			default:
-				p.Tokens = append(p.Tokens, Token{Kind: TokenDiv, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenDiv, Value: string(ch)})
 			}
 		case '*':
-			switch nc := p.Contents.Peek(1); nc {
+			switch nc := lx.Contents.Peek(1); nc {
 			case "*":
-				p.Tokens = append(p.Tokens, Token{Kind: TokenPow, Value: string(ch)})
-				p.Contents.Advance(1)
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenPow, Value: string(ch)})
+				lx.Contents.Advance(1)
 			default:
-				p.Tokens = append(p.Tokens, Token{Kind: TokenMul, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenMul, Value: string(ch)})
 			}
-			p.Tokens = append(p.Tokens, Token{Kind: TokenMul, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenMul, Value: string(ch)})
 		case '!':
-			switch nc := p.Contents.Peek(1); nc {
+			switch nc := lx.Contents.Peek(1); nc {
 			case "=":
-				p.Tokens = append(p.Tokens, Token{Kind: TokenNotEq, Value: string(ch) + nc})
-				p.Contents.Advance(1)
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenNotEq, Value: string(ch) + nc})
+				lx.Contents.Advance(1)
 			default:
-				p.Tokens = append(p.Tokens, Token{Kind: TokenNot, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenNot, Value: string(ch)})
 			}
 		case '%':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenModulo, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenModulo, Value: string(ch)})
 		case '|':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenBitwiseOr, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseOr, Value: string(ch)})
 		case '&':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenBitwiseAnd, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseAnd, Value: string(ch)})
 		case '^':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenBitwiseXor, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseXor, Value: string(ch)})
 		case '~':
-			p.Tokens = append(p.Tokens, Token{Kind: TokenBitwiseNot, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseNot, Value: string(ch)})
 		case '\'', '"':
-			p.Tokens = append(p.Tokens, p.LexString(ch))
+			lx.Tokens = append(lx.Tokens, lx.LexString(ch))
 			continue
 		}
 
 		if IsStartOfIdentifier(ch) {
-			p.Tokens = append(p.Tokens, p.LexIdentifier())
+			lx.Tokens = append(lx.Tokens, lx.LexIdentifier())
 			continue
 		}
 
 		if IsASCIIDigit(ch) {
-			p.Tokens = append(p.Tokens, p.LexNumeric())
+			lx.Tokens = append(lx.Tokens, lx.LexNumeric())
 			continue
 		}
 
-		p.Contents.Advance(1)
+		lx.Contents.Advance(1)
 	}
 }

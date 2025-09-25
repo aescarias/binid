@@ -22,7 +22,7 @@ func main() {
 	}
 
 	sc := bindef.Scanner{Data: string(data), Current: 0}
-	ps := bindef.Parser{Contents: sc, Tokens: []bindef.Token{}}
+	ps := bindef.Lexer{Contents: sc, Tokens: []bindef.Token{}}
 
 	ps.Process()
 
