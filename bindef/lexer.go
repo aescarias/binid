@@ -11,6 +11,8 @@ type TokenKind int
 const (
 	TokenLParen       TokenKind = iota // (
 	TokenRParen                        // )
+	TokenLBrace                        // {
+	TokenRBrace                        // }
 	TokenLBracket                      // [
 	TokenRBracket                      // ]
 	TokenMul                           // *
@@ -49,6 +51,10 @@ func (t TokenKind) String() string {
 		return "LParen"
 	case TokenRParen:
 		return "RParen"
+	case TokenLBrace:
+		return "LBrace"
+	case TokenRBrace:
+		return "RBrace"
 	case TokenLBracket:
 		return "LBracket"
 	case TokenRBracket:
@@ -142,7 +148,7 @@ type Token struct {
 }
 
 type Lexer struct {
-	Contents Scanner
+	Contents Scanner[byte]
 	Tokens   []Token
 }
 
@@ -205,6 +211,10 @@ func (lx *Lexer) Process() {
 			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLParen, Value: string(ch)})
 		case ')':
 			lx.Tokens = append(lx.Tokens, Token{Kind: TokenRParen, Value: string(ch)})
+		case '{':
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLBrace, Value: string(ch)})
+		case '}':
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenRBrace, Value: string(ch)})
 		case '[':
 			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLBracket, Value: string(ch)})
 		case ']':
@@ -216,7 +226,7 @@ func (lx *Lexer) Process() {
 		case '@':
 			lx.Tokens = append(lx.Tokens, Token{Kind: TokenAt, Value: string(ch)})
 		case '=':
-			switch nc := lx.Contents.Peek(1); nc {
+			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "=":
 				lx.Tokens = append(lx.Tokens, Token{Kind: TokenEquals, Value: string(ch) + nc})
 				lx.Contents.Advance(1)
@@ -224,7 +234,7 @@ func (lx *Lexer) Process() {
 				lx.Tokens = append(lx.Tokens, Token{Kind: TokenAssign, Value: string(ch)})
 			}
 		case '>':
-			switch nc := lx.Contents.Peek(1); nc {
+			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "=":
 				lx.Tokens = append(lx.Tokens, Token{Kind: TokenGtEq, Value: string(ch) + nc})
 				lx.Contents.Advance(1)
@@ -235,7 +245,7 @@ func (lx *Lexer) Process() {
 				lx.Tokens = append(lx.Tokens, Token{Kind: TokenGt, Value: string(ch)})
 			}
 		case '<':
-			switch nc := lx.Contents.Peek(1); nc {
+			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "=":
 				lx.Tokens = append(lx.Tokens, Token{Kind: TokenLtEq, Value: string(ch) + nc})
 				lx.Contents.Advance(1)
@@ -250,7 +260,7 @@ func (lx *Lexer) Process() {
 		case '-':
 			lx.Tokens = append(lx.Tokens, Token{Kind: TokenMinus, Value: string(ch)})
 		case '/':
-			switch nc := lx.Contents.Peek(1); nc {
+			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "/":
 				for !lx.Contents.IsDone() && lx.Contents.Cursor() != '\n' {
 					lx.Contents.Advance(1)
@@ -259,16 +269,15 @@ func (lx *Lexer) Process() {
 				lx.Tokens = append(lx.Tokens, Token{Kind: TokenDiv, Value: string(ch)})
 			}
 		case '*':
-			switch nc := lx.Contents.Peek(1); nc {
+			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "*":
 				lx.Tokens = append(lx.Tokens, Token{Kind: TokenPow, Value: string(ch)})
 				lx.Contents.Advance(1)
 			default:
 				lx.Tokens = append(lx.Tokens, Token{Kind: TokenMul, Value: string(ch)})
 			}
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenMul, Value: string(ch)})
 		case '!':
-			switch nc := lx.Contents.Peek(1); nc {
+			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "=":
 				lx.Tokens = append(lx.Tokens, Token{Kind: TokenNotEq, Value: string(ch) + nc})
 				lx.Contents.Advance(1)

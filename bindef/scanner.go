@@ -1,22 +1,22 @@
 package bindef
 
-type Scanner struct {
-	Data    string
+type Scanner[T any] struct {
+	Data    []T
 	Current int
 }
 
-func (s *Scanner) IsDone() bool {
+func (s *Scanner[T]) IsDone() bool {
 	return s.Current >= len(s.Data)
 }
 
-func (s *Scanner) Advance(n int) {
+func (s *Scanner[T]) Advance(n int) {
 	s.Current += n
 }
 
-func (s *Scanner) Cursor() byte {
+func (s *Scanner[T]) Cursor() T {
 	return s.Data[s.Current]
 }
 
-func (s *Scanner) Peek(n int) string {
+func (s *Scanner[T]) Peek(n int) []T {
 	return s.Data[s.Current+1 : s.Current+1+n]
 }
