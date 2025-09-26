@@ -8,8 +8,12 @@ import (
 type ResultKind string
 
 const (
-	ResultInt   ResultKind = "Int"
-	ResultFloat ResultKind = "Float"
+	ResultInt    ResultKind = "Int"
+	ResultFloat  ResultKind = "Float"
+	ResultMap    ResultKind = "Map"
+	ResultList   ResultKind = "List"
+	ResultString ResultKind = "String"
+	ResultIdent  ResultKind = "Identifier"
 )
 
 type Result struct {
@@ -165,9 +169,48 @@ func EvaluateLiteral(node LiteralNode) (Result, error) {
 			return Result{}, fmt.Errorf("failed to convert float: %w", err)
 		}
 		return Result{Kind: ResultFloat, Value: number}, nil
+	case TokenIdentifier:
+		return Result{Kind: ResultIdent, Value: node.Token.Value}, nil
+	case TokenString:
+		return Result{Kind: ResultString, Value: node.Token.Value}, nil
 	default:
-		return Result{}, fmt.Errorf("unknown literal type %s", node.Token.Kind)
+		return Result{}, fmt.Errorf("cannot evaluate unknown literal type %s", node.Token.Kind)
 	}
+}
+
+func EvaluateMap(node MapNode) (Result, error) {
+	items := map[Result]Result{}
+
+	for key, val := range node.Items {
+		keyRes, err := Evaluate(key)
+		if err != nil {
+			return Result{}, err
+		}
+
+		valueRes, err := Evaluate(val)
+		if err != nil {
+			return Result{}, err
+		}
+
+		items[keyRes] = valueRes
+	}
+
+	return Result{Kind: ResultMap, Value: items}, nil
+}
+
+func EvaluateList(node ListNode) (Result, error) {
+	items := []Result{}
+
+	for _, val := range node.Items {
+		valRes, err := Evaluate(val)
+		if err != nil {
+			return Result{}, err
+		}
+
+		items = append(items, valRes)
+	}
+
+	return Result{Kind: ResultList, Value: items}, nil
 }
 
 func Evaluate(tree Node) (Result, error) {
@@ -178,6 +221,10 @@ func Evaluate(tree Node) (Result, error) {
 		return EvaluateUnaryOp(*tree.(*UnaryOpNode))
 	case "Literal":
 		return EvaluateLiteral(*tree.(*LiteralNode))
+	case "Map":
+		return EvaluateMap(*tree.(*MapNode))
+	case "List":
+		return EvaluateList(*tree.(*ListNode))
 	default:
 		return Result{}, fmt.Errorf("cannot evaluate unknown type %s", tree.Type())
 	}

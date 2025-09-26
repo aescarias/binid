@@ -27,6 +27,23 @@ func ShowTree(node bindef.Node, indent int) {
 		litNode := node.(*bindef.LiteralNode)
 
 		fmt.Printf("%s- %s (%s)\n", tabbed, litNode.Type(), litNode.Token.Value)
+	case "Map":
+		mapNode := node.(*bindef.MapNode)
+
+		fmt.Printf("%s- %s\n", tabbed, mapNode.Type())
+
+		for key, value := range mapNode.Items {
+			ShowTree(key, indent+1)
+			ShowTree(value, indent+2)
+		}
+	case "List":
+		listNode := node.(*bindef.ListNode)
+
+		fmt.Printf("%s- %s\n", tabbed, listNode.Type())
+
+		for _, key := range listNode.Items {
+			ShowTree(key, indent+1)
+		}
 	default:
 		fmt.Printf("%s- %#v\n", tabbed, node)
 	}
