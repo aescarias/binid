@@ -23,6 +23,7 @@ const (
 	TokenComma                         // ,
 	TokenColon                         // :
 	TokenAt                            // @
+	TokenDot                           // .
 	TokenAssign                        // =
 	TokenEquals                        // ==
 	TokenLt                            // <
@@ -75,6 +76,8 @@ func (t TokenKind) String() string {
 		return "Colon"
 	case TokenAt:
 		return "At"
+	case TokenDot:
+		return "Dot"
 	case TokenAssign:
 		return "Assign"
 	case TokenEquals:
@@ -142,9 +145,15 @@ func IsStartOfIdentifier(ch byte) bool {
 	return IsASCIIChar(ch) && !IsASCIIDigit(ch) && ch != '-'
 }
 
+type Position struct {
+	Start int
+	End   int
+}
+
 type Token struct {
-	Kind  TokenKind
-	Value string
+	Kind     TokenKind
+	Value    string
+	Position Position
 }
 
 type Lexer struct {
@@ -153,6 +162,7 @@ type Lexer struct {
 }
 
 func (lx *Lexer) LexNumeric() Token {
+	start := lx.Contents.Current
 	digits := []byte{lx.Contents.Cursor()}
 	lx.Contents.Advance(1)
 
@@ -161,14 +171,16 @@ func (lx *Lexer) LexNumeric() Token {
 		lx.Contents.Advance(1)
 	}
 
+	pos := Position{start, lx.Contents.Current}
 	if bytes.Contains(digits, []byte{'.'}) {
-		return Token{Kind: TokenFloat, Value: string(digits)}
+		return Token{Kind: TokenFloat, Value: string(digits), Position: pos}
 	} else {
-		return Token{Kind: TokenInteger, Value: string(digits)}
+		return Token{Kind: TokenInteger, Value: string(digits), Position: pos}
 	}
 }
 
 func (lx *Lexer) LexIdentifier() Token {
+	start := lx.Contents.Current
 	ident := []byte{lx.Contents.Cursor()}
 	lx.Contents.Advance(1)
 
@@ -177,14 +189,17 @@ func (lx *Lexer) LexIdentifier() Token {
 		lx.Contents.Advance(1)
 	}
 
+	pos := Position{start, lx.Contents.Current}
 	if slices.Contains([]string{"and", "or", "true", "false"}, string(ident)) {
-		return Token{Kind: TokenKeyword, Value: string(ident)}
+		return Token{Kind: TokenKeyword, Value: string(ident), Position: pos}
 	} else {
-		return Token{Kind: TokenIdentifier, Value: string(ident)}
+		return Token{Kind: TokenIdentifier, Value: string(ident), Position: pos}
 	}
 }
 
 func (lx *Lexer) LexString(delimiter byte) Token {
+	start := lx.Contents.Current
+
 	strSeq := []byte{}
 	lx.Contents.Advance(1) // for the single-byte start quote
 
@@ -199,66 +214,75 @@ func (lx *Lexer) LexString(delimiter byte) Token {
 		lx.Contents.Advance(1)
 	}
 
-	return Token{Kind: TokenString, Value: string(strSeq)}
+	return Token{
+		Kind:     TokenString,
+		Value:    string(strSeq),
+		Position: Position{start, lx.Contents.Current},
+	}
 }
 
 func (lx *Lexer) Process() {
 	for !lx.Contents.IsDone() {
 		ch := lx.Contents.Cursor()
 
+		singlePos := Position{lx.Contents.Current, lx.Contents.Current + 1}
+		doublePos := Position{lx.Contents.Current, lx.Contents.Current + 2}
+
 		switch ch {
 		case '(':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLParen, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLParen, Value: string(ch), Position: singlePos})
 		case ')':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenRParen, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenRParen, Value: string(ch), Position: singlePos})
 		case '{':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLBrace, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLBrace, Value: string(ch), Position: singlePos})
 		case '}':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenRBrace, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenRBrace, Value: string(ch), Position: singlePos})
 		case '[':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLBracket, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenLBracket, Value: string(ch), Position: singlePos})
 		case ']':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenRBracket, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenRBracket, Value: string(ch), Position: singlePos})
 		case ',':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenComma, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenComma, Value: string(ch), Position: singlePos})
 		case ':':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenColon, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenColon, Value: string(ch), Position: singlePos})
 		case '@':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenAt, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenAt, Value: string(ch), Position: singlePos})
+		case '.':
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenDot, Value: string(ch), Position: singlePos})
 		case '=':
 			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "=":
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenEquals, Value: string(ch) + nc})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenEquals, Value: string(ch) + nc, Position: doublePos})
 				lx.Contents.Advance(1)
 			default:
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenAssign, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenAssign, Value: string(ch), Position: singlePos})
 			}
 		case '>':
 			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "=":
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenGtEq, Value: string(ch) + nc})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenGtEq, Value: string(ch) + nc, Position: doublePos})
 				lx.Contents.Advance(1)
 			case ">":
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseRight, Value: string(ch) + nc})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseRight, Value: string(ch) + nc, Position: doublePos})
 				lx.Contents.Advance(1)
 			default:
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenGt, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenGt, Value: string(ch), Position: singlePos})
 			}
 		case '<':
 			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "=":
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenLtEq, Value: string(ch) + nc})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenLtEq, Value: string(ch) + nc, Position: doublePos})
 				lx.Contents.Advance(1)
 			case "<":
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseLeft, Value: string(ch) + nc})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseLeft, Value: string(ch) + nc, Position: doublePos})
 				lx.Contents.Advance(1)
 			default:
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenLt, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenLt, Value: string(ch), Position: singlePos})
 			}
 		case '+':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenPlus, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenPlus, Value: string(ch), Position: singlePos})
 		case '-':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenMinus, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenMinus, Value: string(ch), Position: singlePos})
 		case '/':
 			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "/":
@@ -266,34 +290,34 @@ func (lx *Lexer) Process() {
 					lx.Contents.Advance(1)
 				}
 			default:
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenDiv, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenDiv, Value: string(ch), Position: singlePos})
 			}
 		case '*':
 			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "*":
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenPow, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenPow, Value: string(ch) + nc, Position: doublePos})
 				lx.Contents.Advance(1)
 			default:
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenMul, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenMul, Value: string(ch), Position: singlePos})
 			}
 		case '!':
 			switch nc := string(lx.Contents.Peek(1)); nc {
 			case "=":
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenNotEq, Value: string(ch) + nc})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenNotEq, Value: string(ch) + nc, Position: doublePos})
 				lx.Contents.Advance(1)
 			default:
-				lx.Tokens = append(lx.Tokens, Token{Kind: TokenNot, Value: string(ch)})
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenNot, Value: string(ch), Position: doublePos})
 			}
 		case '%':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenModulo, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenModulo, Value: string(ch), Position: singlePos})
 		case '|':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseOr, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseOr, Value: string(ch), Position: singlePos})
 		case '&':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseAnd, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseAnd, Value: string(ch), Position: singlePos})
 		case '^':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseXor, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseXor, Value: string(ch), Position: singlePos})
 		case '~':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseNot, Value: string(ch)})
+			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseNot, Value: string(ch), Position: singlePos})
 		case '\'', '"':
 			lx.Tokens = append(lx.Tokens, lx.LexString(ch))
 			continue

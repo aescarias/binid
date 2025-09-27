@@ -46,7 +46,11 @@ func EvaluateBinOp(node BinOpNode) (Result, error) {
 			return Result{Kind: ResultFloat, Value: leftFloat + right.Value.(float64)}, nil
 		}
 
-		return Result{}, fmt.Errorf("cannot perform binary operation %s on types %s and %s", node.Op.Value, left.Kind, right.Kind)
+		return Result{}, LangError{
+			node.Position(),
+			fmt.Sprintf("cannot perform binary operation %s on types %s and %s",
+				node.Op.Value, left.Kind, right.Kind),
+		}
 	case TokenMinus:
 		if left.Kind == ResultInt && right.Kind == ResultInt {
 			return Result{Kind: ResultInt, Value: left.Value.(int) - right.Value.(int)}, nil
@@ -60,7 +64,11 @@ func EvaluateBinOp(node BinOpNode) (Result, error) {
 			return Result{Kind: ResultFloat, Value: leftFloat - right.Value.(float64)}, nil
 		}
 
-		return Result{}, fmt.Errorf("cannot perform binary operation %s on types %s and %s", node.Op.Value, left.Kind, right.Kind)
+		return Result{}, LangError{
+			node.Position(),
+			fmt.Sprintf("cannot perform binary operation %s on types %s and %s",
+				node.Op.Value, left.Kind, right.Kind),
+		}
 	case TokenMul:
 		if left.Kind == ResultInt && right.Kind == ResultInt {
 			return Result{Kind: ResultInt, Value: left.Value.(int) * right.Value.(int)}, nil
@@ -74,7 +82,11 @@ func EvaluateBinOp(node BinOpNode) (Result, error) {
 			return Result{Kind: ResultFloat, Value: leftFloat * right.Value.(float64)}, nil
 		}
 
-		return Result{}, fmt.Errorf("cannot perform binary operation %s on types %s and %s", node.Op.Value, left.Kind, right.Kind)
+		return Result{}, LangError{
+			node.Position(),
+			fmt.Sprintf("cannot perform binary operation %s on types %s and %s",
+				node.Op.Value, left.Kind, right.Kind),
+		}
 	case TokenDiv:
 		if left.Kind == ResultInt && right.Kind == ResultInt {
 			if right.Value.(int) == 0 {
@@ -102,9 +114,16 @@ func EvaluateBinOp(node BinOpNode) (Result, error) {
 			return Result{Kind: ResultFloat, Value: leftFloat / right.Value.(float64)}, nil
 		}
 
-		return Result{}, fmt.Errorf("cannot perform binary operation %s on types %s and %s", node.Op.Value, left.Kind, right.Kind)
+		return Result{}, LangError{
+			node.Position(),
+			fmt.Sprintf("cannot perform binary operation %s on types %s and %s",
+				node.Op.Value, left.Kind, right.Kind),
+		}
 	default:
-		return Result{}, fmt.Errorf("unknown binary operation %s", node.Op.Value)
+		return Result{}, LangError{
+			node.Position(),
+			fmt.Sprintf("undefined binary operation %s", node.Op.Value),
+		}
 	}
 }
 
@@ -122,7 +141,10 @@ func EvaluateUnaryOp(node UnaryOpNode) (Result, error) {
 		case ResultFloat:
 			return Result{Kind: ResultFloat, Value: result.Value.(float64)}, nil
 		default:
-			return Result{}, fmt.Errorf("%s does not support unary op %s", result.Kind, node.Op.Value)
+			return Result{}, LangError{
+				node.Position(),
+				fmt.Sprintf("%s does not support unary operation %s", result.Kind, node.Op.Value),
+			}
 		}
 	case TokenMinus:
 		result, err := Evaluate(node.Node)
@@ -136,7 +158,10 @@ func EvaluateUnaryOp(node UnaryOpNode) (Result, error) {
 		case ResultFloat:
 			return Result{Kind: ResultFloat, Value: -result.Value.(float64)}, nil
 		default:
-			return Result{}, fmt.Errorf("%s does not support unary op %s", result.Kind, node.Op.Value)
+			return Result{}, LangError{
+				node.Position(),
+				fmt.Sprintf("%s does not support unary operation %s", result.Kind, node.Op.Value),
+			}
 		}
 	case TokenBitwiseNot:
 		result, err := Evaluate(node.Node)
@@ -148,10 +173,16 @@ func EvaluateUnaryOp(node UnaryOpNode) (Result, error) {
 		case ResultInt:
 			return Result{Kind: ResultInt, Value: ^result.Value.(int)}, nil
 		default:
-			return Result{}, fmt.Errorf("%s does not support unary op %s", result.Kind, node.Op.Value)
+			return Result{}, LangError{
+				node.Position(),
+				fmt.Sprintf("%s does not support unary operation %s", result.Kind, node.Op.Value),
+			}
 		}
 	default:
-		return Result{}, fmt.Errorf("unknown unary op %s", node.Op.Value)
+		return Result{}, LangError{
+			node.Position(),
+			fmt.Sprintf("undefined binary operation %s", node.Op.Value),
+		}
 	}
 }
 
@@ -160,13 +191,19 @@ func EvaluateLiteral(node LiteralNode) (Result, error) {
 	case TokenInteger:
 		number, err := strconv.Atoi(node.Token.Value)
 		if err != nil {
-			return Result{}, fmt.Errorf("failed to convert integer: %w", err)
+			return Result{}, LangError{
+				node.Position(),
+				fmt.Sprintf("invalid integer literal: %s", err),
+			}
 		}
 		return Result{Kind: ResultInt, Value: number}, nil
 	case TokenFloat:
 		number, err := strconv.ParseFloat(node.Token.Value, 64)
 		if err != nil {
-			return Result{}, fmt.Errorf("failed to convert float: %w", err)
+			return Result{}, LangError{
+				node.Position(),
+				fmt.Sprintf("invalid float literal: %s", err),
+			}
 		}
 		return Result{Kind: ResultFloat, Value: number}, nil
 	case TokenIdentifier:
@@ -174,7 +211,10 @@ func EvaluateLiteral(node LiteralNode) (Result, error) {
 	case TokenString:
 		return Result{Kind: ResultString, Value: node.Token.Value}, nil
 	default:
-		return Result{}, fmt.Errorf("cannot evaluate unknown literal type %s", node.Token.Kind)
+		return Result{}, LangError{
+			node.Position(),
+			fmt.Sprintf("evaluation undefined for literal type %s", node.Token.Kind),
+		}
 	}
 }
 
@@ -226,6 +266,9 @@ func Evaluate(tree Node) (Result, error) {
 	case "List":
 		return EvaluateList(*tree.(*ListNode))
 	default:
-		return Result{}, fmt.Errorf("cannot evaluate unknown type %s", tree.Type())
+		return Result{}, LangError{
+			tree.Position(),
+			fmt.Sprintf("evaluation undefined for type %s", tree.Type()),
+		}
 	}
 }
