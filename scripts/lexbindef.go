@@ -14,22 +14,22 @@ func ShowTree(node bindef.Node, indent int) {
 	tabbed := strings.Repeat(" ", indent)
 
 	switch node.Type() {
-	case "BinOp":
+	case bindef.NodeBinOp:
 		binOp := node.(*bindef.BinOpNode)
 		fmt.Printf("%s- %s (%s)\n", tabbed, binOp.Type(), binOp.Op.Value)
 
 		ShowTree(binOp.Left, indent+1)
 		ShowTree(binOp.Right, indent+1)
-	case "UnaryOp":
+	case bindef.NodeUnaryOp:
 		unaryOp := node.(*bindef.UnaryOpNode)
 		fmt.Printf("%s- %s (%s)\n", tabbed, unaryOp.Type(), unaryOp.Op.Value)
 
 		ShowTree(unaryOp.Node, indent+1)
-	case "Literal":
+	case bindef.NodeLiteral:
 		litNode := node.(*bindef.LiteralNode)
 
 		fmt.Printf("%s- %s (%s)\n", tabbed, litNode.Type(), litNode.Token.Value)
-	case "Map":
+	case bindef.NodeMap:
 		mapNode := node.(*bindef.MapNode)
 
 		fmt.Printf("%s- %s\n", tabbed, mapNode.Type())
@@ -38,7 +38,7 @@ func ShowTree(node bindef.Node, indent int) {
 			ShowTree(key, indent+1)
 			ShowTree(value, indent+2)
 		}
-	case "List":
+	case bindef.NodeList:
 		listNode := node.(*bindef.ListNode)
 
 		fmt.Printf("%s- %s\n", tabbed, listNode.Type())
@@ -46,16 +46,26 @@ func ShowTree(node bindef.Node, indent int) {
 		for _, key := range listNode.Items {
 			ShowTree(key, indent+1)
 		}
-	case "AttrAccess":
-		attrNode := node.(*bindef.AttrAccessNode)
+	case bindef.NodeAttr:
+		attrNode := node.(*bindef.AttrNode)
+		fmt.Printf("%s- %s\n", tabbed, attrNode.Type())
 
-		tokStrs := []string{attrNode.Parent.Value}
+		ShowTree(attrNode.Expr, indent+1)
+		ShowTree(attrNode.Attr, indent+1)
+	case bindef.NodeSubscript:
+		subNode := node.(*bindef.SubscriptNode)
+		fmt.Printf("%s- %s\n", tabbed, subNode.Type())
 
-		for _, tok := range attrNode.Members {
-			tokStrs = append(tokStrs, tok.Value)
+		ShowTree(subNode.Expr, indent+1)
+		ShowTree(subNode.Item, indent+1)
+	case bindef.NodeCall:
+		callNode := node.(*bindef.CallNode)
+		fmt.Printf("%s- %s\n", tabbed, callNode.Type())
+
+		ShowTree(callNode.Expr, indent+1)
+		for _, arg := range callNode.Arguments {
+			ShowTree(arg, indent+1)
 		}
-
-		fmt.Printf("%s- %s (%s)\n", tabbed, attrNode.Type(), strings.Join(tokStrs, "."))
 	default:
 		fmt.Printf("%s- %#v\n", tabbed, node)
 	}

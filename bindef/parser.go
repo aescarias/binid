@@ -1,11 +1,9 @@
 package bindef
 
-import (
-	"fmt"
-)
+import "fmt"
 
 type Node interface {
-	Type() string
+	Type() NodeKind
 	Position() Position
 }
 
@@ -43,77 +41,135 @@ type ListNode struct {
 	pos   Position
 }
 
-type AttrAccessNode struct {
-	Parent  Token
-	Members []Token
+type AttrNode struct {
+	Expr Node
+	Attr Node
 }
 
-func (ln *LiteralNode) Type() string { return "Literal" }
+type SubscriptNode struct {
+	Expr Node
+	Item Node
+}
+
+type CallNode struct {
+	Expr      Node
+	Arguments []Node
+	pos       Position
+}
+
+type NodeKind string
+
+const (
+	NodeLiteral   NodeKind = "Literal"
+	NodeBinOp     NodeKind = "BinOp"
+	NodeUnaryOp   NodeKind = "UnaryOp"
+	NodeMap       NodeKind = "Map"
+	NodeList      NodeKind = "List"
+	NodeAttr      NodeKind = "Attr"
+	NodeSubscript NodeKind = "Subscript"
+	NodeCall      NodeKind = "Call"
+)
+
+func (ln *LiteralNode) Type() NodeKind { return NodeLiteral }
 func (ln *LiteralNode) Position() Position {
 	return ln.Token.Position
 }
 
-func (bn *BinOpNode) Type() string { return "BinOp" }
+func (bn *BinOpNode) Type() NodeKind { return NodeBinOp }
 func (bn *BinOpNode) Position() Position {
 	return Position{Start: bn.Left.Position().Start, End: bn.Right.Position().End}
 }
 
-func (un *UnaryOpNode) Type() string { return "UnaryOp" }
+func (un *UnaryOpNode) Type() NodeKind { return NodeUnaryOp }
 func (un *UnaryOpNode) Position() Position {
 	return Position{Start: un.Op.Position.Start, End: un.Node.Position().End}
 }
 
-func (mn *MapNode) Type() string       { return "Map" }
+func (mn *MapNode) Type() NodeKind     { return NodeMap }
 func (mn *MapNode) Position() Position { return mn.pos }
 
-func (ln *ListNode) Type() string       { return "List" }
+func (ln *ListNode) Type() NodeKind     { return NodeList }
 func (ln *ListNode) Position() Position { return ln.pos }
 
-func (an *AttrAccessNode) Type() string { return "AttrAccess" }
-func (an *AttrAccessNode) Position() Position {
+func (an *AttrNode) Type() NodeKind { return NodeAttr }
+func (an *AttrNode) Position() Position {
 	return Position{
-		Start: an.Parent.Position.Start,
-		End:   an.Members[len(an.Members)-1].Position.End,
+		Start: an.Expr.Position().Start,
+		End:   an.Attr.Position().End,
 	}
 }
+
+func (in *SubscriptNode) Type() NodeKind { return NodeSubscript }
+func (in *SubscriptNode) Position() Position {
+	return Position{
+		Start: in.Expr.Position().Start,
+		End:   in.Item.Position().End,
+	}
+}
+
+func (cn *CallNode) Type() NodeKind     { return NodeCall }
+func (cn *CallNode) Position() Position { return cn.pos }
 
 type Parser struct {
 	Scanner[Token]
 }
 
-func (ps *Parser) ParseLiteral() (Node, error) {
-	switch ps.Cursor().Kind {
-	case TokenInteger, TokenFloat:
-		lit := &LiteralNode{Token: ps.Cursor()}
-		ps.Advance(1)
-		return lit, nil
-	case TokenIdentifier, TokenString:
-		parent := ps.Cursor()
-		lookup := []Token{}
-
-		ps.Advance(1)
-
-		nextAttr := false
-
-		for !ps.IsDone() {
-			tok := ps.Cursor()
-			if tok.Kind == TokenDot {
-				ps.Advance(1)
-				nextAttr = true
-			} else if nextAttr && tok.Kind == TokenIdentifier {
-				lookup = append(lookup, tok)
-				ps.Advance(1)
-				nextAttr = false
-			} else {
-				break
+func (ps *Parser) tryPostfix(left Node) (Node, error) {
+	for !ps.IsDone() {
+		switch ps.Cursor().Kind {
+		case TokenLBracket:
+			ps.Advance(1)
+			item, err := ps.ParseExpr()
+			if err != nil {
+				return nil, err
 			}
+			if ps.IsDone() || ps.Cursor().Kind != TokenRBracket {
+				return nil, LangError{item.Position(), "expected closing bracket for subscript access"}
+			}
+			ps.Advance(1)
+			left = &SubscriptNode{Expr: left, Item: item}
+		case TokenLParen:
+			start := left.Position().Start
+			ps.Advance(1)
+			arguments := []Node{}
+			for !ps.IsDone() && ps.Cursor().Kind != TokenRParen {
+				arg, err := ps.ParseExpr()
+				if err != nil {
+					return nil, err
+				}
+				arguments = append(arguments, arg)
+				if ps.Cursor().Kind == TokenComma {
+					ps.Advance(1)
+				} else if ps.IsDone() || ps.Cursor().Kind != TokenRParen {
+					return nil, LangError{arg.Position(), "expected closing paren in argument list"}
+				}
+			}
+			end := ps.Cursor().Position.End
+			ps.Advance(1)
+			left = &CallNode{Expr: left, Arguments: arguments, pos: Position{start, end}}
+		case TokenDot:
+			ps.Advance(1)
+			if ps.IsDone() || ps.Cursor().Kind != TokenIdentifier {
+				return nil, LangError{left.Position(), "expected identifier after dot"}
+			}
+			attr := &LiteralNode{Token: ps.Cursor()}
+			ps.Advance(1)
+			left = &AttrNode{Expr: left, Attr: attr}
+		default:
+			return left, nil
 		}
+	}
 
-		if len(lookup) <= 0 {
-			return &LiteralNode{Token: parent}, nil
-		} else {
-			return &AttrAccessNode{Parent: parent, Members: lookup}, nil
-		}
+	return left, nil
+}
+
+func (ps *Parser) ParseLiteral() (Node, error) {
+	var left Node
+
+	switch ps.Cursor().Kind {
+	case TokenInteger, TokenFloat, TokenIdentifier, TokenString:
+		left = &LiteralNode{Token: ps.Cursor()}
+		ps.Advance(1)
 	case TokenPlus, TokenMinus, TokenBitwiseNot, TokenNot:
 		tok := ps.Cursor()
 		ps.Advance(1)
@@ -121,7 +177,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 		if err != nil {
 			return nil, err
 		}
-		return &UnaryOpNode{Op: tok, Node: expr}, nil
+		left = &UnaryOpNode{Op: tok, Node: expr}
 	case TokenLParen:
 		ps.Advance(1)
 		expr, err := ps.ParseExpr()
@@ -135,7 +191,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 		}
 		ps.Advance(1)
 
-		return expr, nil
+		left = expr
 	case TokenLBrace:
 		start := ps.Cursor().Position.Start
 		ps.Advance(1)
@@ -147,7 +203,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 				return nil, err
 			}
 
-			if ps.Cursor().Kind != TokenColon {
+			if ps.IsDone() || ps.Cursor().Kind != TokenColon {
 				pos := Position{Start: key.Position().End, End: key.Position().End + 1}
 				return nil, LangError{pos, "expected colon after key in mapping"}
 			}
@@ -158,7 +214,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 				return nil, err
 			}
 
-			if ps.Cursor().Kind == TokenComma {
+			if !ps.IsDone() && ps.Cursor().Kind == TokenComma {
 				ps.Advance(1)
 			} else if ps.IsDone() || ps.Cursor().Kind != TokenRBrace {
 				pos := Position{Start: value.Position().End, End: value.Position().End + 1}
@@ -170,7 +226,8 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 
 		end := ps.Cursor().Position.End
 		ps.Advance(1)
-		return &MapNode{Items: items, pos: Position{start, end}}, nil
+
+		left = &MapNode{Items: items, pos: Position{start, end}}
 	case TokenLBracket:
 		start := ps.Cursor().Position.Start
 		ps.Advance(1)
@@ -182,11 +239,11 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 				return nil, err
 			}
 
-			if ps.Cursor().Kind == TokenComma {
+			if !ps.IsDone() && ps.Cursor().Kind == TokenComma {
 				ps.Advance(1)
 			} else if ps.IsDone() || ps.Cursor().Kind != TokenRBracket {
 				pos := Position{Start: item.Position().End, End: item.Position().End + 1}
-				return nil, LangError{pos, "expected closing bracket for list"}
+				return nil, LangError{pos, "expected closing bracket or comma for list"}
 			}
 
 			items = append(items, item)
@@ -194,13 +251,23 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 
 		end := ps.Cursor().Position.End
 		ps.Advance(1)
-		return &ListNode{Items: items, pos: Position{start, end}}, nil
+
+		left = &ListNode{Items: items, pos: Position{start, end}}
 	}
 
-	return nil, LangError{
-		ps.Cursor().Position,
-		fmt.Sprintf("unknown literal type %s", ps.Cursor().Kind),
+	if left == nil {
+		return nil, LangError{
+			ps.Cursor().Position,
+			fmt.Sprintf("unknown literal type %s", ps.Cursor().Kind),
+		}
 	}
+
+	postfix, err := ps.tryPostfix(left)
+	if err != nil {
+		return nil, err
+	}
+
+	return postfix, nil
 }
 
 func (ps *Parser) ParseFactor() (Node, error) {

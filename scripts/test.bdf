@@ -1,8 +1,0 @@
-{
-  meta: {
-    bdf: "1.0",
-    name: "Paint.NET image file",
-    mime: "image/x-paintnet",
-  	exts: [".pdn"]
-  }
-}

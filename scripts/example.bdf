@@ -18,10 +18,13 @@
     { id: layers,   		
       value: decl.document["pdnImage"]["@layers"] },
     { id: savedWithVersion, 
-      value: decl.document["pdnImage"]["@savedWithVersion"] ,}
+      value: decl.document["pdnImage"]["@savedWithVersion"] },
   ],
   binary: [
-    { match: "PDN3" @ 0 },
+    { type: magic, 
+      match: "PDN3", 
+      at: 0 
+    },
     { type: uint16, 
       id: headerSize,
       chunk: {
