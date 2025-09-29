@@ -2,18 +2,20 @@ package bindef
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 )
 
 type ResultKind string
 
 const (
-	ResultInt    ResultKind = "Int"
-	ResultFloat  ResultKind = "Float"
-	ResultMap    ResultKind = "Map"
-	ResultList   ResultKind = "List"
-	ResultString ResultKind = "String"
-	ResultIdent  ResultKind = "Identifier"
+	ResultInt     ResultKind = "Int"
+	ResultFloat   ResultKind = "Float"
+	ResultBoolean ResultKind = "Boolean"
+	ResultMap     ResultKind = "Map"
+	ResultList    ResultKind = "List"
+	ResultString  ResultKind = "String"
+	ResultIdent   ResultKind = "Identifier"
 )
 
 type Result struct {
@@ -48,7 +50,7 @@ func EvaluateBinOp(node BinOpNode) (Result, error) {
 
 		return Result{}, LangError{
 			node.Position(),
-			fmt.Sprintf("cannot perform binary operation %s on types %s and %s",
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind, right.Kind),
 		}
 	case TokenMinus:
@@ -66,7 +68,7 @@ func EvaluateBinOp(node BinOpNode) (Result, error) {
 
 		return Result{}, LangError{
 			node.Position(),
-			fmt.Sprintf("cannot perform binary operation %s on types %s and %s",
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind, right.Kind),
 		}
 	case TokenMul:
@@ -84,45 +86,84 @@ func EvaluateBinOp(node BinOpNode) (Result, error) {
 
 		return Result{}, LangError{
 			node.Position(),
-			fmt.Sprintf("cannot perform binary operation %s on types %s and %s",
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind, right.Kind),
 		}
 	case TokenDiv:
 		if left.Kind == ResultInt && right.Kind == ResultInt {
 			if right.Value.(int) == 0 {
-				return Result{}, fmt.Errorf("integer division by zero")
+				return Result{}, LangError{node.Position(), "integer division by zero"}
 			}
 
 			return Result{Kind: ResultInt, Value: left.Value.(int) / right.Value.(int)}, nil
 		} else if left.Kind == ResultFloat && right.Kind == ResultFloat {
 			if right.Value.(float64) == 0 {
-				return Result{}, fmt.Errorf("float division by zero")
+				return Result{}, LangError{node.Position(), "float division by zero"}
 			}
 
 			return Result{Kind: ResultFloat, Value: left.Value.(float64) / right.Value.(float64)}, nil
 		} else if left.Kind == ResultFloat && right.Kind == ResultInt {
 			rightFloat := float64(right.Value.(int))
 			if rightFloat == 0.0 {
-				return Result{}, fmt.Errorf("float division by zero")
+				return Result{}, LangError{node.Position(), "float division by zero"}
 			}
+
 			return Result{Kind: ResultFloat, Value: left.Value.(float64) / rightFloat}, nil
 		} else if left.Kind == ResultInt && right.Kind == ResultFloat {
 			leftFloat := float64(left.Value.(int))
 			if right.Value.(float64) == 0.0 {
-				return Result{}, fmt.Errorf("float division by zero")
+				return Result{}, LangError{node.Position(), "float division by zero"}
 			}
+
 			return Result{Kind: ResultFloat, Value: leftFloat / right.Value.(float64)}, nil
 		}
 
 		return Result{}, LangError{
 			node.Position(),
-			fmt.Sprintf("cannot perform binary operation %s on types %s and %s",
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+				node.Op.Value, left.Kind, right.Kind),
+		}
+	case TokenModulo:
+		if left.Kind == ResultInt && right.Kind == ResultInt {
+			if right.Value.(int) == 0 {
+				return Result{}, LangError{node.Position(), "integer modulo by zero"}
+			}
+
+			return Result{Kind: ResultInt, Value: left.Value.(int) % right.Value.(int)}, nil
+		} else if left.Kind == ResultFloat && right.Kind == ResultFloat {
+			if right.Value.(float64) == 0 {
+				return Result{}, LangError{node.Position(), "float modulo by zero"}
+			}
+
+			mod := math.Mod(left.Value.(float64), right.Value.(float64))
+			return Result{Kind: ResultFloat, Value: mod}, nil
+		} else if left.Kind == ResultFloat && right.Kind == ResultInt {
+			rightFloat := float64(right.Value.(int))
+			if rightFloat == 0.0 {
+				return Result{}, LangError{node.Position(), "float modulo by zero"}
+			}
+
+			mod := math.Mod(left.Value.(float64), rightFloat)
+			return Result{Kind: ResultFloat, Value: mod}, nil
+		} else if left.Kind == ResultInt && right.Kind == ResultFloat {
+			leftFloat := float64(left.Value.(int))
+			if right.Value.(float64) == 0.0 {
+				return Result{}, LangError{node.Position(), "float modulo by zero"}
+			}
+
+			mod := math.Mod(leftFloat, right.Value.(float64))
+			return Result{Kind: ResultFloat, Value: mod}, nil
+		}
+
+		return Result{}, LangError{
+			node.Position(),
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind, right.Kind),
 		}
 	default:
 		return Result{}, LangError{
 			node.Position(),
-			fmt.Sprintf("undefined binary operation %s", node.Op.Value),
+			fmt.Sprintf("behavior undefined for binary operation %s", node.Op.Value),
 		}
 	}
 }
@@ -208,6 +249,18 @@ func EvaluateLiteral(node LiteralNode) (Result, error) {
 		return Result{Kind: ResultFloat, Value: number}, nil
 	case TokenIdentifier:
 		return Result{Kind: ResultIdent, Value: node.Token.Value}, nil
+	case TokenKeyword:
+		switch val := node.Token.Value; val {
+		case string(KeywordTrue):
+			return Result{Kind: ResultBoolean, Value: true}, nil
+		case string(KeywordFalse):
+			return Result{Kind: ResultBoolean, Value: false}, nil
+		default:
+			return Result{}, LangError{
+				node.Position(),
+				fmt.Sprintf("unknown keyword %q", val),
+			}
+		}
 	case TokenString:
 		return Result{Kind: ResultString, Value: node.Token.Value}, nil
 	default:

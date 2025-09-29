@@ -123,7 +123,11 @@ func main() {
 
 	sc := bindef.Scanner[byte]{Data: data, Current: 0}
 	lx := bindef.Lexer{Contents: sc, Tokens: []bindef.Token{}}
-	lx.Process()
+
+	if err := lx.Process(); err != nil {
+		ReportError(os.Args[1], data, err)
+		os.Exit(1)
+	}
 
 	fmt.Println("== tokens")
 	for _, tok := range lx.Tokens {
@@ -134,7 +138,7 @@ func main() {
 		Scanner: bindef.Scanner[bindef.Token]{Data: lx.Tokens, Current: 0},
 	}
 
-	tree, err := ps.ParseExpr()
+	tree, err := ps.Parse()
 	if err != nil {
 		ReportError(os.Args[1], data, err)
 		os.Exit(1)

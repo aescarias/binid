@@ -1,6 +1,9 @@
 package bindef
 
-import "fmt"
+import (
+	"fmt"
+	"slices"
+)
 
 type Node interface {
 	Type() NodeKind
@@ -167,7 +170,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 	var left Node
 
 	switch ps.Cursor().Kind {
-	case TokenInteger, TokenFloat, TokenIdentifier, TokenString:
+	case TokenInteger, TokenFloat, TokenIdentifier, TokenString, TokenKeyword:
 		left = &LiteralNode{Token: ps.Cursor()}
 		ps.Advance(1)
 	case TokenPlus, TokenMinus, TokenBitwiseNot, TokenNot:
@@ -280,7 +283,12 @@ func (ps *Parser) ParseFactor() (Node, error) {
 		return nil, err
 	}
 
-	for !ps.IsDone() && (ps.Cursor().Kind == TokenMul || ps.Cursor().Kind == TokenDiv) {
+	ops := []TokenKind{
+		TokenMul, TokenDiv, TokenModulo,
+		TokenBitwiseLeft, TokenBitwiseRight, TokenBitwiseAnd,
+	}
+
+	for !ps.IsDone() && slices.Contains(ops, ps.Cursor().Kind) {
 		tok := ps.Cursor()
 		ps.Advance(1)
 
@@ -306,7 +314,9 @@ func (ps *Parser) ParseExpr() (Node, error) {
 		return nil, err
 	}
 
-	for !ps.IsDone() && (ps.Cursor().Kind == TokenPlus || ps.Cursor().Kind == TokenMinus) {
+	ops := []TokenKind{TokenPlus, TokenMinus, TokenBitwiseOr, TokenBitwiseXor}
+
+	for !ps.IsDone() && slices.Contains(ops, ps.Cursor().Kind) {
 		tok := ps.Cursor()
 		ps.Advance(1)
 
@@ -320,3 +330,84 @@ func (ps *Parser) ParseExpr() (Node, error) {
 
 	return left, nil
 }
+
+func (ps *Parser) ParseComparison() (Node, error) {
+	var (
+		left Node
+		err  error
+	)
+
+	if left, err = ps.ParseExpr(); err != nil {
+		return nil, err
+	}
+
+	ops := []TokenKind{TokenEquals, TokenNotEq, TokenLt, TokenLtEq, TokenGt, TokenGtEq}
+
+	for !ps.IsDone() && slices.Contains(ops, ps.Cursor().Kind) {
+		tok := ps.Cursor()
+		ps.Advance(1)
+
+		right, err := ps.ParseExpr()
+		if err != nil {
+			return nil, err
+		}
+
+		left = &BinOpNode{Left: left, Op: tok, Right: right}
+	}
+
+	return left, nil
+}
+
+func (ps *Parser) ParseLogicalAnd() (Node, error) {
+	var (
+		left Node
+		err  error
+	)
+
+	if left, err = ps.ParseComparison(); err != nil {
+		return nil, err
+	}
+
+	ops := []TokenKind{TokenLogicalAnd}
+
+	for !ps.IsDone() && slices.Contains(ops, ps.Cursor().Kind) {
+		tok := ps.Cursor()
+		ps.Advance(1)
+
+		right, err := ps.ParseComparison()
+		if err != nil {
+			return nil, err
+		}
+
+		left = &BinOpNode{Left: left, Op: tok, Right: right}
+	}
+
+	return left, nil
+}
+
+func (ps *Parser) ParseLogicalOr() (Node, error) {
+	var (
+		left Node
+		err  error
+	)
+
+	if left, err = ps.ParseLogicalAnd(); err != nil {
+		return nil, err
+	}
+
+	for !ps.IsDone() && ps.Cursor().Kind == TokenLogicalOr {
+		tok := ps.Cursor()
+		ps.Advance(1)
+
+		right, err := ps.ParseLogicalAnd()
+		if err != nil {
+			return nil, err
+		}
+
+		left = &BinOpNode{Left: left, Op: tok, Right: right}
+	}
+
+	return left, nil
+}
+
+func (ps *Parser) Parse() (Node, error) { return ps.ParseLogicalOr() }

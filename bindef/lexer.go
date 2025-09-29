@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"slices"
+	"strconv"
 )
 
 type TokenKind int
@@ -39,8 +40,10 @@ const (
 	TokenModulo                        // %
 	TokenNot                           // !
 	TokenNotEq                         // !=
+	TokenLogicalAnd                    // &&
+	TokenLogicalOr                     // ||
 	TokenIdentifier
-	TokenKeyword // and, or, true, false
+	TokenKeyword // true, false
 	TokenInteger
 	TokenFloat
 	TokenString
@@ -108,6 +111,10 @@ func (t TokenKind) String() string {
 		return "Not"
 	case TokenNotEq:
 		return "NotEq"
+	case TokenLogicalAnd:
+		return "LogicalAnd"
+	case TokenLogicalOr:
+		return "LogicalOr"
 	case TokenIdentifier:
 		return "Identifier"
 	case TokenKeyword:
@@ -123,10 +130,21 @@ func (t TokenKind) String() string {
 	}
 }
 
-func IsASCIIChar(ch byte) bool {
+type KeywordKind string
+
+const (
+	KeywordTrue  KeywordKind = "true"
+	KeywordFalse KeywordKind = "false"
+)
+
+// IsASCIILetter reports whether a character ch is an ASCII letter, i.e. a character
+// in the range a-z or A-Z.
+func IsASCIILetter(ch byte) bool {
 	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z'
 }
 
+// IsASCIIDigit reports whether a character ch is an ASCII digit, i.e. a character
+// in the range 0-9.
 func IsASCIIDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
 }
@@ -137,12 +155,12 @@ func IsASCIIDigit(ch byte) bool {
 // and the underscore (_). An identifier must not start with a number or the minus
 // sign and must not contain whitespace within.
 func IsIdentifier(ch byte) bool {
-	return IsASCIIChar(ch) || IsASCIIDigit(ch) || ch == '_' || ch == '-'
+	return IsASCIILetter(ch) || IsASCIIDigit(ch) || ch == '_' || ch == '-'
 }
 
 // IsStartOfIdentifier reports whether a character ch can be the start of a valid identifier.
 func IsStartOfIdentifier(ch byte) bool {
-	return IsASCIIChar(ch) && !IsASCIIDigit(ch) && ch != '-'
+	return IsASCIILetter(ch) && !IsASCIIDigit(ch) && ch != '-'
 }
 
 type Position struct {
@@ -190,23 +208,83 @@ func (lx *Lexer) LexIdentifier() Token {
 	}
 
 	pos := Position{start, lx.Contents.Current}
-	if slices.Contains([]string{"and", "or", "true", "false"}, string(ident)) {
+	if slices.Contains([]string{string(KeywordTrue), string(KeywordFalse)}, string(ident)) {
 		return Token{Kind: TokenKeyword, Value: string(ident), Position: pos}
 	} else {
 		return Token{Kind: TokenIdentifier, Value: string(ident), Position: pos}
 	}
 }
 
-func (lx *Lexer) LexString(delimiter byte) Token {
+var escapeMap = map[byte]byte{
+	'\\': '\\',
+	'\'': '\'',
+	'"':  '"',
+	'n':  '\n',
+	'r':  '\r',
+	't':  '\t',
+}
+
+func (lx *Lexer) LexString(delimiter byte) (Token, error) {
 	start := lx.Contents.Current
 
 	strSeq := []byte{}
 	lx.Contents.Advance(1) // for the single-byte start quote
 
+	closed := false
 	for !lx.Contents.IsDone() {
 		cur := lx.Contents.Cursor()
+
+		if cur == '\\' {
+			escapeStart := lx.Contents.Current
+			lx.Contents.Advance(1)
+
+			nc := lx.Contents.Cursor()
+			if escape, ok := escapeMap[nc]; ok {
+				strSeq = append(strSeq, escape)
+				lx.Contents.Advance(1)
+				continue
+			}
+
+			if nc == 'x' {
+				const byteSize int = 2
+				hexSeq := string(lx.Contents.Peek(byteSize))
+				hexVal, err := strconv.ParseInt(hexSeq, 16, 8)
+				if err != nil {
+					return Token{}, LangError{
+						Position{escapeStart, lx.Contents.Current + byteSize},
+						fmt.Sprintf("invalid hex sequence %s", hexSeq),
+					}
+				}
+
+				lx.Contents.Advance(byteSize + 1)
+				strSeq = append(strSeq, byte(hexVal))
+				continue
+			} else if IsASCIIDigit(nc) {
+				const octSize int = 3
+
+				octSeq := string(lx.Contents.Cursor()) + string(lx.Contents.Peek(octSize-1))
+				octVal, err := strconv.ParseInt(octSeq, 8, 8)
+				if err != nil {
+					return Token{}, LangError{
+						Position{escapeStart, lx.Contents.Current + octSize},
+						fmt.Sprintf("invalid octal sequence %s", octSeq),
+					}
+				}
+
+				lx.Contents.Advance(octSize)
+				strSeq = append(strSeq, byte(octVal))
+				continue
+			}
+
+			return Token{}, LangError{
+				Position{escapeStart, lx.Contents.Current},
+				fmt.Sprintf("unknown escape sequence %q", lx.Contents.Cursor()),
+			}
+		}
+
 		if cur == delimiter {
 			lx.Contents.Advance(1)
+			closed = true
 			break
 		}
 
@@ -214,14 +292,21 @@ func (lx *Lexer) LexString(delimiter byte) Token {
 		lx.Contents.Advance(1)
 	}
 
+	if !closed {
+		return Token{}, LangError{
+			Position{start, lx.Contents.Current},
+			"string was never closed",
+		}
+	}
+
 	return Token{
 		Kind:     TokenString,
 		Value:    string(strSeq),
 		Position: Position{start, lx.Contents.Current},
-	}
+	}, nil
 }
 
-func (lx *Lexer) Process() {
+func (lx *Lexer) Process() error {
 	for !lx.Contents.IsDone() {
 		ch := lx.Contents.Cursor()
 
@@ -311,15 +396,32 @@ func (lx *Lexer) Process() {
 		case '%':
 			lx.Tokens = append(lx.Tokens, Token{Kind: TokenModulo, Value: string(ch), Position: singlePos})
 		case '|':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseOr, Value: string(ch), Position: singlePos})
+			switch nc := string(lx.Contents.Peek(1)); nc {
+			case "|":
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenLogicalOr, Value: string(ch) + nc, Position: doublePos})
+				lx.Contents.Advance(1)
+			default:
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseOr, Value: string(ch), Position: doublePos})
+			}
 		case '&':
-			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseAnd, Value: string(ch), Position: singlePos})
+			switch nc := string(lx.Contents.Peek(1)); nc {
+			case "&":
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenLogicalAnd, Value: string(ch) + nc, Position: doublePos})
+				lx.Contents.Advance(1)
+			default:
+				lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseAnd, Value: string(ch), Position: doublePos})
+			}
 		case '^':
 			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseXor, Value: string(ch), Position: singlePos})
 		case '~':
 			lx.Tokens = append(lx.Tokens, Token{Kind: TokenBitwiseNot, Value: string(ch), Position: singlePos})
 		case '\'', '"':
-			lx.Tokens = append(lx.Tokens, lx.LexString(ch))
+			strTok, err := lx.LexString(ch)
+			if err != nil {
+				return err
+			}
+
+			lx.Tokens = append(lx.Tokens, strTok)
 			continue
 		}
 
@@ -335,4 +437,6 @@ func (lx *Lexer) Process() {
 
 		lx.Contents.Advance(1)
 	}
+
+	return nil
 }
