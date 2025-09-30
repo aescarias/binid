@@ -16,6 +16,7 @@ const (
 	ResultList    ResultKind = "List"
 	ResultString  ResultKind = "String"
 	ResultIdent   ResultKind = "Identifier"
+	ResultLazy    ResultKind = "Lazy"
 )
 
 type Result struct {
@@ -23,13 +24,15 @@ type Result struct {
 	Value any
 }
 
-func EvaluateBinOp(node BinOpNode) (Result, error) {
-	left, err := Evaluate(node.Left)
+type Namespace map[Result]Result
+
+func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
+	left, err := Evaluate(node.Left, namespace)
 	if err != nil {
 		return Result{}, err
 	}
 
-	right, err := Evaluate(node.Right)
+	right, err := Evaluate(node.Right, namespace)
 	if err != nil {
 		return Result{}, err
 	}
@@ -168,10 +171,10 @@ func EvaluateBinOp(node BinOpNode) (Result, error) {
 	}
 }
 
-func EvaluateUnaryOp(node UnaryOpNode) (Result, error) {
+func EvaluateUnaryOp(node UnaryOpNode, namespace Namespace) (Result, error) {
 	switch node.Op.Kind {
 	case TokenPlus:
-		result, err := Evaluate(node.Node)
+		result, err := Evaluate(node.Node, namespace)
 		if err != nil {
 			return Result{}, err
 		}
@@ -188,7 +191,7 @@ func EvaluateUnaryOp(node UnaryOpNode) (Result, error) {
 			}
 		}
 	case TokenMinus:
-		result, err := Evaluate(node.Node)
+		result, err := Evaluate(node.Node, namespace)
 		if err != nil {
 			return Result{}, err
 		}
@@ -205,7 +208,7 @@ func EvaluateUnaryOp(node UnaryOpNode) (Result, error) {
 			}
 		}
 	case TokenBitwiseNot:
-		result, err := Evaluate(node.Node)
+		result, err := Evaluate(node.Node, namespace)
 		if err != nil {
 			return Result{}, err
 		}
@@ -227,7 +230,7 @@ func EvaluateUnaryOp(node UnaryOpNode) (Result, error) {
 	}
 }
 
-func EvaluateLiteral(node LiteralNode) (Result, error) {
+func EvaluateLiteral(node LiteralNode, ns Namespace) (Result, error) {
 	switch node.Token.Kind {
 	case TokenInteger:
 		number, err := strconv.Atoi(node.Token.Value)
@@ -248,7 +251,20 @@ func EvaluateLiteral(node LiteralNode) (Result, error) {
 		}
 		return Result{Kind: ResultFloat, Value: number}, nil
 	case TokenIdentifier:
-		return Result{Kind: ResultIdent, Value: node.Token.Value}, nil
+		ident := Result{Kind: ResultIdent, Value: node.Token.Value}
+
+		if ns != nil {
+			value, ok := ns[ident]
+			if !ok {
+				return Result{}, LangError{
+					node.Position(),
+					fmt.Sprintf("%q is not defined", node.Token.Value),
+				}
+			}
+			return value, nil
+		}
+
+		return ident, nil
 	case TokenKeyword:
 		switch val := node.Token.Value; val {
 		case string(KeywordTrue):
@@ -271,18 +287,31 @@ func EvaluateLiteral(node LiteralNode) (Result, error) {
 	}
 }
 
-func EvaluateMap(node MapNode) (Result, error) {
+func EvaluateMap(node MapNode, namespace Namespace) (Result, error) {
 	items := map[Result]Result{}
 
 	for key, val := range node.Items {
-		keyRes, err := Evaluate(key)
+		keyRes, err := Evaluate(key, namespace)
 		if err != nil {
 			return Result{}, err
 		}
 
-		valueRes, err := Evaluate(val)
+		lazy, err := MustEvaluateLazily(val)
 		if err != nil {
 			return Result{}, err
+		}
+
+		var valueRes Result
+		if lazy {
+			valueRes = Result{
+				Kind:  ResultLazy,
+				Value: func(ns Namespace) (Result, error) { return Evaluate(val, ns) },
+			}
+		} else {
+			valueRes, err = Evaluate(val, namespace)
+			if err != nil {
+				return Result{}, err
+			}
 		}
 
 		items[keyRes] = valueRes
@@ -291,13 +320,26 @@ func EvaluateMap(node MapNode) (Result, error) {
 	return Result{Kind: ResultMap, Value: items}, nil
 }
 
-func EvaluateList(node ListNode) (Result, error) {
+func EvaluateList(node ListNode, namespace Namespace) (Result, error) {
 	items := []Result{}
 
 	for _, val := range node.Items {
-		valRes, err := Evaluate(val)
+		lazy, err := MustEvaluateLazily(val)
 		if err != nil {
 			return Result{}, err
+		}
+
+		var valRes Result
+		if lazy {
+			valRes = Result{
+				Kind:  ResultLazy,
+				Value: func(ns Namespace) (Result, error) { return Evaluate(val, ns) },
+			}
+		} else {
+			valRes, err = Evaluate(val, namespace)
+			if err != nil {
+				return Result{}, err
+			}
 		}
 
 		items = append(items, valRes)
@@ -306,22 +348,145 @@ func EvaluateList(node ListNode) (Result, error) {
 	return Result{Kind: ResultList, Value: items}, nil
 }
 
-func Evaluate(tree Node) (Result, error) {
+func EvaluateAttr(node AttrNode, namespace Namespace) (Result, error) {
+	expr, err := Evaluate(node.Expr, namespace)
+	if err != nil {
+		return Result{}, err
+	}
+
+	attr, err := Evaluate(node.Attr, nil)
+	if err != nil {
+		return Result{}, err
+	}
+
+	var (
+		value Result
+		ok    bool
+	)
+
+	switch expr.Kind {
+	case ResultIdent:
+		value, ok = namespace[attr]
+	case ResultMap:
+		value, ok = expr.Value.(map[Result]Result)[attr]
+	default:
+		return Result{}, LangError{
+			node.Position(),
+			fmt.Sprintf("object of type %s does not support attribute access", expr.Kind),
+		}
+	}
+
+	if !ok {
+		return Result{}, LangError{
+			node.Position(),
+			fmt.Sprintf("object of type %s does not have a member named %q", expr.Kind, attr.Value),
+		}
+	}
+
+	return value, nil
+}
+
+func Evaluate(tree Node, namespace Namespace) (Result, error) {
 	switch tree.Type() {
-	case "BinOp":
-		return EvaluateBinOp(*tree.(*BinOpNode))
-	case "UnaryOp":
-		return EvaluateUnaryOp(*tree.(*UnaryOpNode))
-	case "Literal":
-		return EvaluateLiteral(*tree.(*LiteralNode))
-	case "Map":
-		return EvaluateMap(*tree.(*MapNode))
-	case "List":
-		return EvaluateList(*tree.(*ListNode))
+	case NodeBinOp:
+		return EvaluateBinOp(*tree.(*BinOpNode), namespace)
+	case NodeUnaryOp:
+		return EvaluateUnaryOp(*tree.(*UnaryOpNode), namespace)
+	case NodeLiteral:
+		return EvaluateLiteral(*tree.(*LiteralNode), namespace)
+	case NodeMap:
+		return EvaluateMap(*tree.(*MapNode), namespace)
+	case NodeAttr:
+		return EvaluateAttr(*tree.(*AttrNode), namespace)
+	case NodeList:
+		return EvaluateList(*tree.(*ListNode), namespace)
 	default:
 		return Result{}, LangError{
 			tree.Position(),
 			fmt.Sprintf("evaluation undefined for type %s", tree.Type()),
+		}
+	}
+}
+
+// MustEvaluateLazily reports whether the provided node must be evaluated lazily,
+// that is, whether the node must be evaluated on access rather than on parse.
+func MustEvaluateLazily(node Node) (bool, error) {
+	switch node.Type() {
+	case NodeBinOp:
+		binOp := node.(*BinOpNode)
+		leftLazy, err := MustEvaluateLazily(binOp.Left)
+		if err != nil {
+			return false, err
+		}
+
+		rightLazy, err := MustEvaluateLazily(binOp.Right)
+		if err != nil {
+			return false, err
+		}
+
+		return leftLazy || rightLazy, nil
+	case NodeUnaryOp:
+		unary := node.(*UnaryOpNode)
+		lazy, err := MustEvaluateLazily(unary.Node)
+		if err != nil {
+			return false, err
+		}
+
+		return lazy, nil
+	case NodeAttr:
+		// attr requires a namespace
+		return true, nil
+	case NodeSubscript:
+		subscript := node.(*SubscriptNode)
+		exprLazy, err := MustEvaluateLazily(subscript.Expr)
+		if err != nil {
+			return false, err
+		}
+
+		itemLazy, err := MustEvaluateLazily(subscript.Item)
+		if err != nil {
+			return false, err
+		}
+
+		return exprLazy || itemLazy, nil
+	case NodeLiteral:
+		switch lit := node.(*LiteralNode); lit.Token.Kind {
+		case TokenIdentifier:
+			return true, nil
+		default:
+			return false, nil
+		}
+	case NodeMap, NodeList:
+		// map and list may contain lazily evaluated nodes but, in general,
+		// as they're literals, they can be evaluated immediately.
+		return false, nil
+	case NodeCall:
+		call := node.(*CallNode)
+
+		exprLazy, err := MustEvaluateLazily(call.Expr)
+		if err != nil {
+			return false, err
+		}
+		if exprLazy {
+			return true, nil
+		}
+
+		for _, arg := range call.Arguments {
+			argLazy, err := MustEvaluateLazily(arg)
+			if err != nil {
+				return false, err
+			}
+
+			if argLazy {
+				return true, nil
+			}
+		}
+
+		return false, nil
+	default:
+		return false, LangError{
+			node.Position(),
+			fmt.Sprintf("evaluation undefined for type %s", node.Type()),
 		}
 	}
 }

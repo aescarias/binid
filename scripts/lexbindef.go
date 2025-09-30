@@ -148,7 +148,7 @@ func main() {
 	fmt.Println("== syntax tree")
 	ShowTree(tree, 0)
 
-	result, err := bindef.Evaluate(tree)
+	result, err := bindef.Evaluate(tree, nil)
 	if err != nil {
 		ReportError(os.Args[1], data, err)
 		os.Exit(1)

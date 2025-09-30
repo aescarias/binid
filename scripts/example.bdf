@@ -21,14 +21,11 @@
       value: decl.document["pdnImage"]["@savedWithVersion"] },
   ],
   binary: [
-    { type: magic, 
-      match: "PDN3", 
-      at: 0 
-    },
-    { type: uint16, 
+    { type: magic, match: "PDN3" },
+    { type: uint32, 
       id: headerSize,
-      chunk: {
-        value: lib.read(4, 3) + "\x00",
+      from: {
+        value: file.read(3) + "\x00",
         endian: "little"
       }
     },
