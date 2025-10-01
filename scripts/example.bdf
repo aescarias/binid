@@ -3,9 +3,9 @@
 
 {
   meta: {
-    bdf: "1.0",
+    bdf: "0.1",
     name: "Paint.NET image file",
-    mime: "image/x-paintnet",
+    mime: ["image/x-paintnet"],
   	exts: [".pdn"],
   },
   decl: [

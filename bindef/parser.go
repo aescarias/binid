@@ -117,6 +117,10 @@ type Parser struct {
 	Scanner[Token]
 }
 
+func NewParser(tokens []Token) Parser {
+	return Parser{Scanner: NewScanner(tokens)}
+}
+
 func (ps *Parser) tryPostfix(left Node) (Node, error) {
 	for !ps.IsDone() {
 		switch ps.Cursor().Kind {

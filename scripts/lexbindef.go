@@ -92,7 +92,7 @@ func ReportError(filepath string, source []byte, err error) {
 		for idx, lineStr := range bytes.Split(bytes.TrimSuffix(source, []byte("\n")), []byte("\n")) {
 			if idx == line {
 				length := lerr.Position.End - lerr.Position.Start
-				fmt.Printf("in %s:%d:%d-%d\n", filepath, line+1, column, column+length)
+				fmt.Printf("in %s:%d:%d-%d\n", filepath, line+1, column+1, column+1+length)
 				fmt.Printf("error: %s\n", lerr.Message)
 
 				trimmed := strings.TrimLeftFunc(string(lineStr), unicode.IsSpace)
@@ -100,9 +100,9 @@ func ReportError(filepath string, source []byte, err error) {
 
 				fmt.Println("   ", trimmed)
 				fmt.Println("   ", strings.Repeat(" ", column-diff-1)+strings.Repeat("^", length))
+				break
 			}
 		}
-
 	} else {
 		fmt.Println(err)
 	}
@@ -121,22 +121,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	sc := bindef.Scanner[byte]{Data: data, Current: 0}
-	lx := bindef.Lexer{Contents: sc, Tokens: []bindef.Token{}}
+	lex := bindef.NewLexer(data)
 
-	if err := lx.Process(); err != nil {
+	if err := lex.Process(); err != nil {
 		ReportError(os.Args[1], data, err)
 		os.Exit(1)
 	}
 
 	fmt.Println("== tokens")
-	for _, tok := range lx.Tokens {
+	for _, tok := range lex.Tokens {
 		fmt.Println(tok)
 	}
 
-	ps := bindef.Parser{
-		Scanner: bindef.Scanner[bindef.Token]{Data: lx.Tokens, Current: 0},
-	}
+	ps := bindef.NewParser(lex.Tokens)
 
 	tree, err := ps.Parse()
 	if err != nil {
@@ -157,4 +154,18 @@ func main() {
 	fmt.Println()
 	fmt.Println("== result")
 	fmt.Println(result)
+
+	fmt.Println()
+	fmt.Println("== metadata")
+
+	meta, err := bindef.GetMetadata(result)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("bdf: %s\n", meta.BdfVersion)
+	fmt.Printf("name: %s\n", meta.Name)
+	fmt.Printf("mime type(s): %s\n", strings.Join(meta.Mime, ", "))
+	fmt.Printf("extension(s): %s\n", strings.Join(meta.Exts, ", "))
 }
