@@ -1,0 +1,32 @@
+// BinDef for the header of a Quite Okay Image (QOI) file
+//
+// For details on the QOI format, read the spec at:
+//     https://qoiformat.org/qoi-specification.pdf
+
+{
+  meta: {
+    bdf: "0.1",
+    name: "Quite Ok Image (QOI) data",
+    mime: ["image/x-qoi"],
+    exts: [".qoi"]
+  },
+  binary: [
+    { type: magic, 
+      match: "qoif" 
+    },
+    { id: width,      
+      type: uint32, 
+      endian: "big" 
+    },
+    { id: height,     
+      type: uint32, 
+      endian: "big" 
+    },
+    { id: channels,   
+      type: uint8 
+    },
+    { id: colorSpace, 
+      type: uint8 
+    }
+  ]
+}

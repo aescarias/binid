@@ -450,12 +450,7 @@ func MustEvaluateLazily(node Node) (bool, error) {
 
 		return exprLazy || itemLazy, nil
 	case NodeLiteral:
-		switch lit := node.(*LiteralNode); lit.Token.Kind {
-		case TokenIdentifier:
-			return true, nil
-		default:
-			return false, nil
-		}
+		return false, nil
 	case NodeMap, NodeList:
 		// map and list may contain lazily evaluated nodes but, in general,
 		// as they're literals, they can be evaluated immediately.

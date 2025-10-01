@@ -110,21 +110,21 @@ func ReportError(filepath string, source []byte, err error) {
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("usage: lexbindef [filename]")
+		fmt.Println("usage: lexbindef [filepath to bdf] [filepath to target]")
 		os.Exit(1)
 	}
 
-	data, err := os.ReadFile(os.Args[1])
+	bdfData, err := os.ReadFile(os.Args[1])
 
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	lex := bindef.NewLexer(data)
+	lex := bindef.NewLexer(bdfData)
 
 	if err := lex.Process(); err != nil {
-		ReportError(os.Args[1], data, err)
+		ReportError(os.Args[1], bdfData, err)
 		os.Exit(1)
 	}
 
@@ -137,7 +137,7 @@ func main() {
 
 	tree, err := ps.Parse()
 	if err != nil {
-		ReportError(os.Args[1], data, err)
+		ReportError(os.Args[1], bdfData, err)
 		os.Exit(1)
 	}
 
@@ -147,7 +147,7 @@ func main() {
 
 	result, err := bindef.Evaluate(tree, nil)
 	if err != nil {
-		ReportError(os.Args[1], data, err)
+		ReportError(os.Args[1], bdfData, err)
 		os.Exit(1)
 	}
 
@@ -168,4 +168,16 @@ func main() {
 	fmt.Printf("name: %s\n", meta.Name)
 	fmt.Printf("mime type(s): %s\n", strings.Join(meta.Mime, ", "))
 	fmt.Printf("extension(s): %s\n", strings.Join(meta.Exts, ", "))
+
+	fmt.Println()
+	fmt.Println("== details")
+	contents, err := bindef.ApplyBDF(result, os.Args[2])
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	for key, val := range contents {
+		fmt.Printf("%s: %v\n", key, val)
+	}
 }

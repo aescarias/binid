@@ -1,7 +1,12 @@
 package bindef
 
 import (
+	"encoding/binary"
 	"fmt"
+	"io"
+	"os"
+	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -126,6 +131,174 @@ func parseMeta(meta Result) (Meta, error) {
 		Mime:       mimeList,
 		Exts:       extsList,
 	}, nil
+}
+
+func resultTo[T any](res Result, kind ResultKind) (T, error) {
+	if res.Kind != kind {
+		var zero T
+		return zero, fmt.Errorf("expected type %s, received %s", kind, res)
+	}
+
+	val, ok := res.Value.(T)
+	if !ok {
+		panic(fmt.Sprintf("type assertion failed for %s", kind))
+	}
+
+	return val, nil
+}
+
+func resultToMap[T map[Result]Result](res Result) (T, error) {
+	return resultTo[T](res, ResultMap)
+}
+
+func resultToSlice[T []Result](res Result) (T, error) {
+	return resultTo[T](res, ResultList)
+}
+
+func resultToString[T string](res Result) (T, error) {
+	return resultTo[T](res, ResultString)
+}
+
+func resultToIdent[T string](res Result) (T, error) {
+	return resultTo[T](res, ResultIdent)
+}
+
+func checkBinMagic(handle *os.File, item map[Result]Result) error {
+	offset, err := handle.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return err
+	}
+
+	magicAt, err := resultToString(item[ident("match")])
+	if err != nil {
+		return err
+	}
+
+	matchBytes := make([]byte, len(magicAt))
+	if _, err := handle.Read(matchBytes); err != nil {
+		return err
+	}
+
+	if !slices.Equal(matchBytes, []byte(magicAt)) {
+		return fmt.Errorf("did not find magic at position %d", offset)
+	}
+
+	return nil
+}
+
+type AnyUint interface {
+	uint | uint8 | uint16 | uint32 | uint64
+}
+
+func getBinUint[T AnyUint](handle *os.File, item map[Result]Result) (T, error) {
+	var zero T
+
+	size := reflect.TypeOf(zero).Size()
+
+	numBytes := make([]byte, size)
+	if _, err := handle.Read(numBytes); err != nil {
+		return zero, err
+	}
+
+	kind := reflect.TypeOf(zero).Kind()
+
+	if kind == reflect.Uint8 {
+		return T(numBytes[0]), nil
+	}
+
+	endian, err := resultToString(item[ident("endian")])
+	if err != nil {
+		return zero, err
+	}
+
+	switch endian {
+	case "little":
+		switch kind {
+		case reflect.Uint16:
+			return T(binary.LittleEndian.Uint16(numBytes)), nil
+		case reflect.Uint, reflect.Uint32:
+			return T(binary.LittleEndian.Uint32(numBytes)), nil
+		case reflect.Uint64:
+			return T(binary.LittleEndian.Uint64(numBytes)), nil
+		}
+	case "big":
+		switch kind {
+		case reflect.Uint16:
+			return T(binary.BigEndian.Uint16(numBytes)), nil
+		case reflect.Uint, reflect.Uint32:
+			return T(binary.BigEndian.Uint32(numBytes)), nil
+		case reflect.Uint64:
+			return T(binary.BigEndian.Uint64(numBytes)), nil
+		}
+	}
+
+	return zero, fmt.Errorf("not a uint")
+}
+
+func ApplyBDF(document Result, targetFile string) (map[string]any, error) {
+	contents := map[string]any{}
+
+	root, err := resultToMap(document)
+	if err != nil {
+		return nil, fmt.Errorf("root: %w", err)
+	}
+
+	handle, err := os.Open(targetFile)
+	if err != nil {
+		return nil, err
+	}
+	defer handle.Close()
+
+	binarySeq, err := resultToSlice(root[ident("binary")])
+	if err != nil {
+		return nil, fmt.Errorf("binary: %w", err)
+	}
+
+	for idx, res := range binarySeq {
+		binItem, err := resultToMap(res)
+		if err != nil {
+			return nil, fmt.Errorf("binary[%d]: %w", idx, err)
+		}
+
+		typeStr, err := resultToIdent(binItem[ident("type")])
+		if err != nil {
+			return nil, fmt.Errorf("binary[%d].type: %w", idx, err)
+		}
+
+		switch typeStr {
+		case "magic":
+			if err := checkBinMagic(handle, binItem); err != nil {
+				return nil, fmt.Errorf("binary[%d]: %w", idx, err)
+			}
+		case "uint8", "uint16", "uint32", "uint64":
+			var num any
+			var err error
+
+			switch typeStr {
+			case "uint8":
+				num, err = getBinUint[uint8](handle, binItem)
+			case "uint16":
+				num, err = getBinUint[uint16](handle, binItem)
+			case "uint32":
+				num, err = getBinUint[uint32](handle, binItem)
+			case "uint64":
+				num, err = getBinUint[uint64](handle, binItem)
+			}
+
+			if err != nil {
+				return nil, fmt.Errorf("binary[%d].type: %w", idx, err)
+			}
+
+			ident, err := resultToIdent(binItem[ident("id")])
+			if err != nil {
+				return nil, fmt.Errorf("binary[%d].name: %w", idx, err)
+			}
+
+			contents[ident] = num
+		}
+	}
+
+	return contents, nil
 }
 
 // GetMetadata returns the metadata described in the 'meta' key of document.
