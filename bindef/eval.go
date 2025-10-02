@@ -233,14 +233,14 @@ func EvaluateUnaryOp(node UnaryOpNode, namespace Namespace) (Result, error) {
 func EvaluateLiteral(node LiteralNode, ns Namespace) (Result, error) {
 	switch node.Token.Kind {
 	case TokenInteger:
-		number, err := strconv.Atoi(node.Token.Value)
+		number, err := strconv.ParseInt(node.Token.Value, 0, 0)
 		if err != nil {
 			return Result{}, LangError{
 				node.Position(),
 				fmt.Sprintf("invalid integer literal: %s", err),
 			}
 		}
-		return Result{Kind: ResultInt, Value: number}, nil
+		return Result{Kind: ResultInt, Value: int(number)}, nil
 	case TokenFloat:
 		number, err := strconv.ParseFloat(node.Token.Value, 64)
 		if err != nil {

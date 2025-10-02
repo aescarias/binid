@@ -143,10 +143,27 @@ func IsASCIILetter(ch byte) bool {
 	return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z'
 }
 
-// IsASCIIDigit reports whether a character ch is an ASCII digit, i.e. a character
+// IsDecimalDigit reports whether a character ch is a decimal digit, i.e. a character
 // in the range 0-9.
-func IsASCIIDigit(ch byte) bool {
+func IsDecimalDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
+}
+
+// IsHexDigit reports whether a character ch is a hexadecimal digit, i.e. a character
+// in the range 0-9 then A-F or a-f.
+func IsHexDigit(ch byte) bool {
+	return ('0' <= ch && ch <= '9') || ('a' <= ch && ch <= 'f') || ('A' <= ch && ch <= 'F')
+}
+
+// IsOctalDigit reports whether a character ch is an octal digit, i.e. a character
+// in the range 0-7.
+func IsOctalDigit(ch byte) bool {
+	return '0' <= ch && ch <= '7'
+}
+
+// IsBinaryDigit reports whether a character ch is a binary digit, i.e. 0 or 1.
+func IsBinaryDigit(ch byte) bool {
+	return ch == '0' || ch == '1'
 }
 
 // IsASCIIWhitespace reports whether a character ch is ASCII whitespace, i.e. any
@@ -163,12 +180,12 @@ func IsASCIIWhitespace(ch byte) bool {
 // and the underscore (_). An identifier must not start with a number or the minus
 // sign and must not contain whitespace within.
 func IsIdentifier(ch byte) bool {
-	return IsASCIILetter(ch) || IsASCIIDigit(ch) || ch == '_' || ch == '-'
+	return IsASCIILetter(ch) || IsDecimalDigit(ch) || ch == '_' || ch == '-'
 }
 
 // IsStartOfIdentifier reports whether a character ch can be the start of a valid identifier.
 func IsStartOfIdentifier(ch byte) bool {
-	return IsASCIILetter(ch) && !IsASCIIDigit(ch) && ch != '-'
+	return IsASCIILetter(ch) && !IsDecimalDigit(ch) && ch != '-'
 }
 
 type Position struct {
@@ -196,7 +213,36 @@ func (lx *Lexer) LexNumeric() Token {
 	digits := []byte{lx.Cursor()}
 	lx.Advance(1)
 
-	for !lx.IsDone() && (IsASCIIDigit(lx.Cursor()) || lx.Cursor() == '.') {
+	type match func(ch byte) bool
+	var isDigit match
+
+	if digits[0] == '0' {
+		switch lx.Cursor() {
+		case 'b': // binary
+			isDigit = IsBinaryDigit
+			digits = append(digits, lx.Cursor())
+			lx.Advance(1)
+		case 'o': // octal
+			isDigit = IsOctalDigit
+			digits = append(digits, lx.Cursor())
+			lx.Advance(1)
+		case 'x': // hex
+			isDigit = IsHexDigit
+			digits = append(digits, lx.Cursor())
+			lx.Advance(1)
+		}
+	}
+
+	if isDigit == nil {
+		isDigit = func(ch byte) bool { return IsDecimalDigit(ch) || lx.Cursor() == '.' }
+	}
+
+	for !lx.IsDone() && (isDigit(lx.Cursor()) || lx.Cursor() == '_') {
+		if lx.Cursor() == '_' {
+			lx.Advance(1)
+			continue
+		}
+
 		digits = append(digits, lx.Cursor())
 		lx.Advance(1)
 	}
@@ -271,7 +317,7 @@ func (lx *Lexer) LexString(delimiter byte) (Token, error) {
 				lx.Advance(byteSize + 1)
 				strSeq = append(strSeq, byte(hexVal))
 				continue
-			} else if IsASCIIDigit(nc) {
+			} else if IsDecimalDigit(nc) {
 				const octSize int = 3
 
 				octSeq := string(lx.Cursor()) + string(lx.Peek(octSize-1))
@@ -359,6 +405,7 @@ func (lx *Lexer) Process() error {
 			case "=":
 				lx.addToken(TokenEquals, string(ch)+nc)
 				lx.Advance(1)
+				continue
 			}
 		case '>':
 			switch nc := string(lx.Peek(1)); nc {
@@ -371,6 +418,9 @@ func (lx *Lexer) Process() error {
 			default:
 				lx.addToken(TokenGt, string(ch))
 			}
+			lx.Advance(1)
+			continue
+
 		case '<':
 			switch nc := string(lx.Peek(1)); nc {
 			case "=":
@@ -382,6 +432,9 @@ func (lx *Lexer) Process() error {
 			default:
 				lx.addToken(TokenLt, string(ch))
 			}
+			lx.Advance(1)
+			continue
+
 		case '/':
 			switch nc := string(lx.Peek(1)); nc {
 			case "/":
@@ -391,6 +444,8 @@ func (lx *Lexer) Process() error {
 				continue
 			default:
 				lx.addToken(TokenDiv, string(ch))
+				lx.Advance(1)
+				continue
 			}
 		case '*':
 			switch nc := string(lx.Peek(1)); nc {
@@ -400,6 +455,8 @@ func (lx *Lexer) Process() error {
 			default:
 				lx.addToken(TokenMul, string(ch))
 			}
+			lx.Advance(1)
+			continue
 		case '!':
 			switch nc := string(lx.Peek(1)); nc {
 			case "=":
@@ -408,6 +465,8 @@ func (lx *Lexer) Process() error {
 			default:
 				lx.addToken(TokenNot, string(ch))
 			}
+			lx.Advance(1)
+			continue
 		case '|':
 			switch nc := string(lx.Peek(1)); nc {
 			case "|":
@@ -416,6 +475,8 @@ func (lx *Lexer) Process() error {
 			default:
 				lx.addToken(TokenBitwiseOr, string(ch))
 			}
+			lx.Advance(1)
+			continue
 		case '&':
 			switch nc := string(lx.Peek(1)); nc {
 			case "&":
@@ -424,6 +485,8 @@ func (lx *Lexer) Process() error {
 			default:
 				lx.addToken(TokenBitwiseAnd, string(ch))
 			}
+			lx.Advance(1)
+			continue
 		case '\'', '"':
 			strTok, err := lx.LexString(ch)
 			if err != nil {
@@ -439,7 +502,7 @@ func (lx *Lexer) Process() error {
 			continue
 		}
 
-		if IsASCIIDigit(ch) {
+		if IsDecimalDigit(ch) {
 			lx.Tokens = append(lx.Tokens, lx.LexNumeric())
 			continue
 		}
