@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Sphinx Objects Inventory version 2",
+    mime: ["application/x-intersphinx"],
+    exts: [".inv"],
+  },
+  binary: [
+    { type: magic, match: "# Sphinx inventory version 2" } 
+  ]
+}

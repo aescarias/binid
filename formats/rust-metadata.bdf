@@ -1,0 +1,17 @@
+// BinDef for the header of a rustc binary metadata file
+{
+  meta: {
+    bdf: "0.1",
+    name: "rustc crate metadata archive",
+    mime: [],
+    exts: [".rmeta"]
+  },
+  binary: [
+    { type: magic, match: "rust\x00\x00\x00" },
+    { id: version, type: uint8 },
+    { id: rootPos, type: uint64, endian: "little" },
+
+    { type: uint16,               id: targetTupleLen, endian: "big", at: rootPos },
+    { type: byte[targetTupleLen], id: targetTuple,    endian: "big" },
+  ]
+}

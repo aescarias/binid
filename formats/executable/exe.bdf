@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "MZ Portable Executable",
+    mime: ["application/x-msdownload"],
+    exts: [".exe", ".dll"],
+  },
+  binary: [
+    { type: magic, match: "MZ" } 
+  ]
+}

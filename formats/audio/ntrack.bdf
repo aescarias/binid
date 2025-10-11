@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "n-Track Studio v1 song file",
+    mime: [], // no mime documented
+    exts: [".sng"],
+  },
+  binary: [
+    { type: magic, match: "n-Track [Studio] sng filespec v1" }
+  ]
+}

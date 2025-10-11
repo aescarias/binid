@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Adobe Portable Document Format",
+    mime: ["application/pdf"],
+    exts: [".pdf"],
+  },
+  binary: [
+    { type: magic, match: "%PDF-" } 
+  ]
+}

@@ -1,0 +1,13 @@
+// BinDef for the header of a Scriptable Network Graphics (.sng) file.
+// Spec available at https://sng.sourceforge.net/sng.html
+{
+  meta: {
+    bdf: "0.1",
+    name: "Scriptable Network Graphics (SNG)",
+    mime: ["text/plain"], // no mime known for this format
+    exts: [".sng"]
+  },
+  binary: [
+    { type: magic, match: "#SNG" }
+  ]
+}

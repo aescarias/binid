@@ -1,0 +1,17 @@
+// BinDef for a SQLite 3 database file (.db)
+// https://www.sqlite.org/fileformat.html
+{
+  meta: {
+    bdf: "0.1",
+    name: "SQLite database file",
+    mime: ["application/vnd.sqlite3"],
+    exts: [".db"],
+  },
+  binary: [
+    { type: magic, match: "SQLite format 3\x00" },
+    { id: pageSize, type: uint16, endian: "big" },
+    { id: writeVersion, type: uint8 },
+    { id: readVersion, type: uint8 },
+    { id: _reserved, type: uint8 }
+  ]
+}

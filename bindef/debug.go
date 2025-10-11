@@ -1,0 +1,110 @@
+package bindef
+
+import (
+	"bytes"
+	"fmt"
+	"strings"
+	"unicode"
+)
+
+// ShowSyntaxTree prints the abstract syntax tree (AST) defined by node starting at the
+// specified indent level.
+func ShowSyntaxTree(node Node, indent int) {
+	tabbed := strings.Repeat(" ", indent)
+
+	switch node.Type() {
+	case NodeBinOp:
+		binOp := node.(*BinOpNode)
+		fmt.Printf("%s- %s (%s)\n", tabbed, binOp.Type(), binOp.Op.Value)
+
+		ShowSyntaxTree(binOp.Left, indent+1)
+		ShowSyntaxTree(binOp.Right, indent+1)
+	case NodeUnaryOp:
+		unaryOp := node.(*UnaryOpNode)
+		fmt.Printf("%s- %s (%s)\n", tabbed, unaryOp.Type(), unaryOp.Op.Value)
+
+		ShowSyntaxTree(unaryOp.Node, indent+1)
+	case NodeLiteral:
+		litNode := node.(*LiteralNode)
+
+		fmt.Printf("%s- %s (%s)\n", tabbed, litNode.Type(), litNode.Token.Value)
+	case NodeMap:
+		mapNode := node.(*MapNode)
+
+		fmt.Printf("%s- %s\n", tabbed, mapNode.Type())
+
+		for key, value := range mapNode.Items {
+			ShowSyntaxTree(key, indent+1)
+			ShowSyntaxTree(value, indent+2)
+		}
+	case NodeList:
+		listNode := node.(*ListNode)
+
+		fmt.Printf("%s- %s\n", tabbed, listNode.Type())
+
+		for _, key := range listNode.Items {
+			ShowSyntaxTree(key, indent+1)
+		}
+	case NodeAttr:
+		attrNode := node.(*AttrNode)
+		fmt.Printf("%s- %s\n", tabbed, attrNode.Type())
+
+		ShowSyntaxTree(attrNode.Expr, indent+1)
+		ShowSyntaxTree(attrNode.Attr, indent+1)
+	case NodeSubscript:
+		subNode := node.(*SubscriptNode)
+		fmt.Printf("%s- %s\n", tabbed, subNode.Type())
+
+		ShowSyntaxTree(subNode.Expr, indent+1)
+		ShowSyntaxTree(subNode.Item, indent+1)
+	case NodeCall:
+		callNode := node.(*CallNode)
+		fmt.Printf("%s- %s\n", tabbed, callNode.Type())
+
+		ShowSyntaxTree(callNode.Expr, indent+1)
+		for _, arg := range callNode.Arguments {
+			ShowSyntaxTree(arg, indent+1)
+		}
+	default:
+		fmt.Printf("%s- %#v\n", tabbed, node)
+	}
+}
+
+// ReportError prints an error report for a file at filepath with byte contents source
+// containing details about err.
+func ReportError(filepath string, source []byte, err error) {
+	if lerr, ok := err.(LangError); ok {
+		line, column, offset := 0, 0, 0
+		var ch byte
+
+		for offset, ch = range source {
+			column += 1
+
+			if ch == '\n' {
+				line += 1
+				column = 0
+			}
+
+			if offset >= lerr.Position.Start {
+				break
+			}
+		}
+
+		for idx, lineStr := range bytes.Split(bytes.TrimSuffix(source, []byte("\n")), []byte("\n")) {
+			if idx == line {
+				length := lerr.Position.End - lerr.Position.Start
+				fmt.Printf("in %s:%d:%d-%d\n", filepath, line+1, column+1, column+1+length)
+				fmt.Printf("error: %s\n", lerr.Message)
+
+				trimmed := strings.TrimLeftFunc(string(lineStr), unicode.IsSpace)
+				diff := len(string(lineStr)) - len(trimmed)
+
+				fmt.Println("   ", trimmed)
+				fmt.Println("   ", strings.Repeat(" ", column-diff-1)+strings.Repeat("^", length))
+				break
+			}
+		}
+	} else {
+		fmt.Println(err)
+	}
+}

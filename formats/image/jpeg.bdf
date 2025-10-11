@@ -1,0 +1,25 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "JPEG image",
+    mime: ["image/jpeg"],
+    exts: [".jpg", ".jpeg"],
+  },
+  binary: [
+    { type: magic, 
+      match: [
+        "\xff\xd8\xff\xdb",
+		    "\xff\xd8\xff\xe0\x00\x10\x4a\x46\x49\x46\x00\x01", // JFIF
+		    "\xff\xd8\xff\xee",
+		    "\xff\xd8\xff\xe0",
+		    "\x00\x00\x00\x0c\x6a\x50\x20\x20\x0d\x0a\x87\x0a", // JPEG 2000
+        "\xff\x4f\xff\x51",                                 // ...
+        // commenting until I add this
+        // [                                                   // EXIF
+        //  { value: "\xff\xd8\xff\xe1", at: 0 }, 
+        //  { value: "Exif\x00\x00", at: 6 },          
+        // ]
+      ] 
+    } 
+  ]
+}

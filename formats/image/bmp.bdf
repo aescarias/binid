@@ -1,0 +1,16 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Windows Bitmap file",
+    mime: ["image/bmp", "image/x-bmp"],
+    exts: [".bmp"],
+  },
+  binary: [
+    // bm header 
+    { type: magic, match: "BM" },
+    { id: size,         type: uint32, endian: "little" },
+    { id: _appDefined1, type: uint16, endian: "little" },
+    { id: _appDefined2, type: uint16, endian: "little" },
+    { id: imageOffset,  type: uint32, endian: "little" },
+  ]
+}

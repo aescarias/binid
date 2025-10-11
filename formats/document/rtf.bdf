@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Rich Text Format document",
+    mime: ["application/rtf"],
+    exts: [".rtf"]
+  },
+  binary: [
+    { type: magic, match: "{\\rtf1" }
+  ]
+}

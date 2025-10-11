@@ -1,0 +1,36 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Extended Module (XM)",
+    mime: ["audio/x-xm"],
+    exts: [".xm"],
+    doc: 
+      "Extended Module (XM) is an audio file format containing a tracker module. " +
+      "It was introduced by Triton's FastTracker II and has been adopted by many " +
+      "other trackers such as MilkyTracker and Mikmod."
+       
+  },
+  binary: [
+    { type: magic,    match: "Extended Module: " },
+    
+    { type: byte[20], id: moduleName,      name: "Module name",  strip: true },
+    { type: uint8 }, // pad byte
+    
+    { type: byte[20], id: trackerName,     name: "Tracker name", strip: true },
+    { type: uint8,    id: majorVersion,    name: "XM major version" },
+    { type: uint8,    id: minorVersion,    name: "XM minor version" },
+    
+    { type: uint32,   id: headerSize,      name: "Header size (bytes)",                endian: "little" },
+    { type: uint16,   id: patOrderLen,     name: "Pattern table order length (bytes)", endian: "little" },
+    { type: uint16,   id: restartPosition, name: "Restart position",                   endian: "little" },
+
+    { type: uint16,   id: numChannels,     name: "No. of channels",    endian: "little" },
+    { type: uint16,   id: numPatterns,     name: "No. of patterns",    endian: "little" },
+    { type: uint16,   id: numInstruments,  name: "No. of instruments", endian: "little" },
+
+    { type: uint16,   id: flags,           name: "Flags",            endian: "little" },
+
+    { type: uint16,   id: defaultTempo,    name: "Default tempo",    endian: "little" },
+    { type: uint16,   id: defaultBPM,      name: "Default BPM",      endian: "little" },
+  ]
+}

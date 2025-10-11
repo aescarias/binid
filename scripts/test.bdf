@@ -1,0 +1,14 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Generic RIFF chunk",
+    exts: [],
+    mime: []
+  },
+  binary: [
+    { type: magic, match: "RIFF" },
+    { type: uint32,  id: fileSize, endian: "little" },
+    { type: byte[4], id: fileType },
+    { type: byte[fileSize], id: chunk}
+  ]
+}

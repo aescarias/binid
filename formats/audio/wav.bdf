@@ -1,0 +1,13 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Waveform Audio file",
+    mime: ["audio/wav"],
+    exts: [".wav"]
+  },
+  binary: [
+    { type: magic, match: "RIFF" },
+    { type: uint32 },
+    { type: magic, match: "WAVE" },
+  ]
+}

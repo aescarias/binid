@@ -1,0 +1,20 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Executable and Linkable Format",
+    mime: ["application/x-executable"],
+    exts: [],
+    doc: 
+      "The Executable and Linkable Format (ELF) is a common standard file format " +
+      "used for executable files and shared libraries. It is the standard executable " +
+      "file format among Unix-likes."
+  },
+  binary: [
+    { type: magic, match: "\x7fELF" },
+    { id: class,      type: uint8, name: "Class" },
+    { id: endian,     type: uint8, name: "Endianness" },
+    { id: version,    type: uint8, name: "Version" },
+    { id: abiType,    type: uint8, name: "Target ABI" },
+    { id: abiVersion, type: uint8, name: "Target ABI version" },
+  ]
+}

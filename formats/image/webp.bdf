@@ -1,0 +1,13 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "WebP image",
+    mime: ["image/webp"],
+    exts: [".webp"],
+  },
+  binary: [
+    { type: magic, match: "RIFF" },
+    { type: uint32 },
+    { type: magic, match: "WEBP" }, 
+  ]
+}

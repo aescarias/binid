@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Microsoft cabinet file",
+    mime: ["application/vnd.ms-cab-compressed"],
+    exts: [".cab"]
+  },
+  binary: [
+    { type: magic, match: "MSCF" }
+  ]
+}

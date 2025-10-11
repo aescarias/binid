@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Paint.NET image file",
+    mime: ["image/x-paintnet"],
+    exts: [".pdn"],
+  },
+  binary: [
+    { type: magic, match: "PDN3" },
+  ]
+}

@@ -1,0 +1,18 @@
+// BinDef for the ZIP compressed archive
+// https://pkware.cachefly.net/webdocs/casestudies/APPNOTE.TXT
+{
+  meta: {
+    bdf: "0.1",
+    name: "ZIP compressed archive",
+    mime: ["application/zip"],
+    exts: [".zip"],
+  },
+  binary: [
+    { type: magic, match: "PK\x03\x04" },
+    { id: minVersion,        type: uint16, endian: "little" },
+    { id: gpBitFlag,         type: uint16, endian: "little" },
+    { id: compressionMethod, type: uint16, endian: "little" },
+    { id: lastModFileTime,   type: uint16, endian: "little" },
+    { id: lastModFileDate,   type: uint16, endian: "little" },
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "ZStandard compressed data",
+    mime: ["application/zstd"],
+    exts: [".zst"]
+  },
+  binary: [
+    { type: magic, match: "\x28\xB5\x2F\xFD" }
+  ]
+}

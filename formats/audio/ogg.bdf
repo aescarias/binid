@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Ogg Container",
+    mime: ["application/ogg"],
+    exts: [".ogg"]
+  },
+  binary: [
+    { type: magic, match: "OggS" }
+  ]
+}

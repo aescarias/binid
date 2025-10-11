@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Graphics Interchange Format (GIF)",
+    mime: ["image/gif"],
+    exts: [".gif"]
+  },
+  binary: [
+    { type: magic, match: ["GIF87a", "GIF89a"] }, 
+  ]
+}

@@ -2,13 +2,12 @@
 //
 // For details on the QOI format, read the spec at:
 //     https://qoiformat.org/qoi-specification.pdf
-
 {
   meta: {
     bdf: "0.1",
     name: "Quite Ok Image (QOI) data",
     mime: ["image/x-qoi"],
-    exts: [".qoi"]
+    exts: [".qoi"],
   },
   binary: [
     { type: magic, 

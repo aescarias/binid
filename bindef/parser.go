@@ -277,7 +277,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 	return postfix, nil
 }
 
-func (ps *Parser) ParseFactor() (Node, error) {
+func (ps *Parser) ParsePower() (Node, error) {
 	var (
 		left Node
 		err  error
@@ -287,8 +287,33 @@ func (ps *Parser) ParseFactor() (Node, error) {
 		return nil, err
 	}
 
+	for !ps.IsDone() && ps.Cursor().Kind == TokenPow {
+		tok := ps.Cursor()
+		ps.Advance(1)
+
+		right, err := ps.ParseLiteral()
+		if err != nil {
+			return nil, err
+		}
+
+		left = &BinOpNode{Left: left, Op: tok, Right: right}
+	}
+
+	return left, nil
+}
+
+func (ps *Parser) ParseFactor() (Node, error) {
+	var (
+		left Node
+		err  error
+	)
+
+	if left, err = ps.ParsePower(); err != nil {
+		return nil, err
+	}
+
 	ops := []TokenKind{
-		TokenMul, TokenDiv, TokenModulo,
+		TokenMul, TokenDiv, TokenRemainder,
 		TokenBitwiseLeft, TokenBitwiseRight, TokenBitwiseAnd,
 	}
 
@@ -296,7 +321,7 @@ func (ps *Parser) ParseFactor() (Node, error) {
 		tok := ps.Cursor()
 		ps.Advance(1)
 
-		right, err := ps.ParseLiteral()
+		right, err := ps.ParsePower()
 		if err != nil {
 			return nil, err
 		}
@@ -372,9 +397,7 @@ func (ps *Parser) ParseLogicalAnd() (Node, error) {
 		return nil, err
 	}
 
-	ops := []TokenKind{TokenLogicalAnd}
-
-	for !ps.IsDone() && slices.Contains(ops, ps.Cursor().Kind) {
+	for !ps.IsDone() && ps.Cursor().Kind == TokenLogicalAnd {
 		tok := ps.Cursor()
 		ps.Advance(1)
 

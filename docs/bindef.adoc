@@ -1,0 +1,629 @@
+= The BinDef Language Reference
+Ángel Carias <lotta.dev@outlook.com>
+v0.1, 2025-10-10
+:toc: auto
+:sectnums: |,all|
+
+WARNING: This document describes a format that is in early development. Many things are currently undocumented, unimplemented, and are bound to change. 
+
+== What is BinDef?
+
+The BinDef (Binary Definition) language is a declarative language for describing a binary file format. BinDef provides abstractions for validating magic signatures, reading structures, dealing with endianness, and more, under a simple JSON-like format. 
+
+BinDef was created for use with the file identification tool BinID allowing this tool to be extensible. While describing a /binary format in an imperative language such as C or Go (which the reference BinDef implementation uses) is definitely possible, the objective of the BinID tool makes this task tiresome as similar patterns and boilerplate emerge.
+
+Hence, the need was born for a simple language like BinDef that allows developers to quickly describe the contents of a file format.
+
+== Comments
+
+In BinDef, single line comments start with `//` and extend to the end of line.
+
+[source,javascript]
+----
+// this is a comment
+{
+  meta: {
+    bdf: "0.1" // comments can also appear here
+  }
+}
+----
+
+BinDef does not currently support block comments (`/* comment */`). This will come in the near future.
+
+== Data Types
+
+BinDef has the following data types:
+
+- Strings
+- Identifiers
+- Booleans
+- Integers
+- Floats
+- Lists
+- Mappings
+- Lazy Expressions
+
+=== Strings
+
+Strings are sequences of Unicode code points that start and end with a single quote (`'`) or a double quote (`"`).
+
+[source,javascript]
+----
+"Hello, world!"
+"I'm a string!"
+"This is a palm tree: 🌴"
+----
+
+A string must start and end with the same quote, so expressions such as `'hello world"` are not allowed.
+
+A string may span multiple lines.
+
+[source,text]
+----
+"
+Hello, world!
+This string is many lines long.
+"
+----
+
+==== Escape Sequences
+
+A string may contain the following escape sequences.
+
+- `\\` inserts a backslash (`\`).
+- `\'` inserts a single quote (`'`).
+- `\'` inserts a double quote (`"`).
+- `\n` inserts a newline.
+- `\r` inserts a carriage return.
+- `\t` inserts a horizontal tab.
+- `\xhh` inserts a character with the hexadecimal code `hh`.
+- `\ooo` inserts a character with the octal code `ooo`.
+
+Usage of an unknown escape sequence will result in an error.
+
+=== Booleans
+
+Booleans in BinDef are supported via the `true` and `false` identifiers.
+[source,javascript]
+----
+true false
+----
+
+=== Integers
+
+Integers consist of a sequence of digits representing a numeric value. The range of values that may be represented by an integer may depend on the internals of the interpreter but this range shall be enough to hold anything within the 64-bit signed integer limit.
+
+[source,javascript]
+----
+1000
+----
+
+NOTE: The reference implementation does not define an integer limit as it uses arbitrary-precision integers.
+
+A number may include a leading sign bit (+ or -). 
+
+[source,javascript]
+----
+-1000
++2000
+----
+
+A number may not start with a leading zero.
+
+[source,javascript]
+----
+01000 // invalid
+----
+
+To help readability, underscore (`_`) characters may appear anywhere within the numeric sequence.
+
+[source,javascript]
+----
+1_000_000
+----
+
+==== Base-Prefixed Integers
+
+Certain integer values may be better expressed using a different notation. BinDef supports this via base-prefixed integers which start with a `0` followed by one of the following characters:
+
+- `b`: The sequence of digits is interpreted in binary (base 2).
+- `o`: The sequence of digits is interpreted in octal (base 8).
+- `x`: The sequence of digits is interpreted in hexadecimal (base 16).
+
+[source,javascript]
+----
+0b10100  //  20 in decimal
+0o755    // 493 in decimal
+0xff     // 255 in decimal
+----
+
+Underscore characters must appear after the base prefix.
+
+=== Floats
+
+Floating point numbers, or floats, consist of a sequence of digits separated by a period (`.`). 
+
+[source,javascript]
+----
+2.71828
+3.14159
+----
+
+The range of values that a float may represent shall be enough to hold anything within the double-precision floating point format.
+
+Leading or trailing periods within a floating point number are not allowed.
+
+[source,javascript]
+----
+.10 // invalid
+0.  // invalid
+1.2 // valid
+----
+
+Like integers, floats may also have a sign bit.
+
+[source,javascript]
+----
+-2.71828
++3.14159
+----
+
+=== Identifiers
+
+Identifiers consist of a sequence of characters and are effectively atomic values that may be interpreted differently depending on context (in some cases, they are interpreted as a *format type* or as a *reference* within the structure).
+
+An identifier may be formed of any amount of alphanumeric characters, that is, any character within the range A-Z, a-z, and 0-9. The underscore character (`_`) and minus sign (`-`) are also allowed within an identifier.
+
+[source,javascript]
+----
+this_is_an_identifier 
+thisIdentifies
+this-also-identifies
+----
+
+An identifier cannot start with a decimal digit or with the minus sign (`-`).
+
+=== Mappings
+
+Mappings are key-value pairs and represent the core structure of a BinDef document. A mapping begins with a _left brace_ `{` and ends with a _right brace_ `}`. The key and value in the pair are separated by a colon and each pair in the mapping is separated by a comma. 
+
+[source,javascript]
+----
+{
+  foo: 1,
+  bar: 2,
+  baz: 3
+}
+----
+
+The key and value may be any valid data type.
+
+=== Lists
+
+Lists are ordered collections of elements. A list may contain any amount of items of any valid type.
+
+The elements of a list are enclosed in brackets (`[]`) and each element is separated by a comma (`,`)
+
+[source,javascript]
+----
+[
+    1, 
+    "hello", 
+    world, 
+    ["a", "list"],
+    { a: "map" }
+]
+----
+
+=== Lazy Expressions
+
+Lazy expressions are types containing operations that are lazily evaluated, i.e. computed when accessing the structure including them rather than during interpreting.
+
+This lazy evaluation applies to operations requiring namespace access. A namespace is a mapping used internally by the language runtime and generated from the main BinDef document. Because a namespace can only be 
+
+The following expressions are considered _lazy_:
+
+- Attribute access
+- Function calls
+- Subscripts (`mapping[key]`, `list[index]`, and `type[param]`)
+- Identifiers
+
+Binary or unary operations that include operands meeting these conditions are also considered lazy. 
+
+Identifiers are considered lazy as their processing is context-aware. Within BinDef, an identifier can represent both an assignment (see Format Types) and a reference within a namespace. The only identifiers not considered lazy are those identifying *format types*.
+
+Lazy expressions shall always appear as a single constant or operand and must not be an operand of another expression. For example, `(a + b) / (c + d)` does not produce the division of two lazy expressions but rather a lazy expression containing the division of the resolved operands.
+
+[source,javascript]
+----
+// to evaluate this, the namespace "foo" must exist and have a member "bar"
+foo.bar + 2
+// function calls and subscript access also need namespace access
+foo[bar] + spam(eggs)
+// the following expression can be evaluated immediately
+2**3 + 1
+----
+
+== Unary Operators
+
+A unary operation applies an operation on a single type.
+
+The following unary operators are available:
+
+- Unary minus (`-num`) negates the numeric value following it.
+- Unary plus (`+num`) is the same as `num` but is provided for completeness.
+- Unary tilde (`~int`) applies the _bitwise complement_ on integer `int`, i.e., inverts each bit of the integer.
+- TODO: Unary not (`!expr`) performs boolean or logical negation to its operand `expr`, converting a truthy value to false and vice versa.
+
+== Binary Operators
+
+A binary operations performs an operation on two types.
+
+The following binary operations are defined:
+
+- Addition (`+`)
+- Subtraction (`-`)
+- Multiplication (`*`)
+- Division (`/`)
+- Remainder (`%`)
+- Exponentiation (`**`)
+- Bitwise left shift (`<<`)
+- Bitwise right shift (`>>`)
+- Bitwise OR (`|`)
+- Bitwise AND (`&`)
+- Bitwise XOR (`^`)
+
+=== Addition (`+`)
+
+If `a` and `b` are numeric types (integers and floats), `a + b` returns the sum of a plus b. If either operand is a float, the other operand is converted to a float and the resulting value will also be a float.
+
+If `a` and `b` are strings, `a + b` returns the concatenation of the strings `a` and `b`.
+
+Examples are shown below.
+
+[source,javascript]
+----
+1 + 4 // 5
+3.1 + 2 // 5.1
+-9 + 7 // -2
+"foo" + "bar" // "foobar"
+----
+
+=== Subtraction
+
+If `a` and `b` are numeric types, `a - b` returns the subtraction of a and b.
+
+[source,javascript]
+----
+1 - 4 // -3
+5 - 3 // 2
+4.5 - 1 // 3.5
+----
+
+=== Multiplication
+
+If `a` and `b` are numeric types, `a * b` returns the product of a and b.
+
+[source,javascript]
+----
+3 * 3    // 9
+1.27 * 4 // 5.08
+-3 * 2   // -6
+----
+
+=== Division
+
+If `a` and `b` are numeric types, `a * b` returns the quotient of a and b.
+
+[source,javascript]
+----
+200 / 10 // 20
+4.3 / 5 // 0.86
+----
+
+BinDef does not define division by zero. Performing such operation will result in an error.
+
+=== Remainder
+
+If `a` and `b` are numeric types, `a % b` returns the remainder of a and b.
+
+[source,javascript]
+----
+200 % 10 // 0
+3.2 % 2  // 1.2
+----
+
+The sign bit of the result will be the same as the sign bit of the dividend.
+
+[source,javascript]
+----
+-3.2 %  2  // -1.2
+ 3.2 % -2  //  1.2
+----
+
+=== Exponentiation
+
+If `a` and `b` are numeric types, `a ** b` returns the result of base `a` to the power `b`.
+
+[source,javascript]
+----
+  2 ** 6 // 64
+2.5 ** 3 // 15.625
+----
+
+BinDef defines the expression `0 ** 0` as 1.
+
+=== Bitwise Operators
+
+Bitwise operators allow performing bit-level operations on integers.
+
+The bitwise operators defined are:
+
+- Bitwise left shift (`<<`)
++
+`m << n` shifts the bits of integer `n` `m` places to the left. 
+
+- Bitwise right shift (`>>`)
++
+`m >> n` shifts the bits of integer `n` `m` places to the right.
+
+- Bitwise OR (`|`)
++
+`x | y` compares two integers `x` and `y`. If either bit x~n~ or y~n~ is set, the resulting bit is 1; otherwise, the resulting bit is zero.
+
+- Bitwise AND (`&`)
++
+`x & y` compares two integers `x` and `y`. If both bits x~n~ or y~n~ are set, the resulting bit is 1; otherwise, the resulting bit is zero.
+
+- Bitwise XOR (`^`)
++
+`x ^ y` compares two integers `x` and `y`. If either bit x~n~ or y~n~ is set, the resulting bit is 1; otherwise, if both or none of the bits are set, the resulting bit is zero.
+
+=== Comparison Operators
+
+WARNING: This section documents a currently unimplemented feature.
+
+Comparison operators report whether two operators are either distinct or equal to each other in some way.
+
+The operators defined are:
+
+- Equal to (`==`)
+- Not equal to (`!=`)
+- Less than (`<`)
+- Less than or equal to (`<=`)
+- Greater than (`>`)
+- Greater than or equal to (`>=`)
+- Logical and (`&&`)
+- Logical or (`||`)
+
+==== Equal to (`==`) and not equal to (`!=`)
+
+The equality operators `==` and `!=` report whether two operands `a` and `b` are equal to or distinct from each other, respectively.
+
+If `a` and `b` are distinct types, `a == b` will return false and `a != b` will return true.
+
+The next conditions will be explained with the equality operator `==`. The result of the `!=` operator is effectively a negation of the result of `a == b`.
+
+*Numbers:* If `a` and `b` are both integers or both floats, `a == b` is true if the numeric values are equal, and false otherwise.
+
+In the case that `a` is a float and `b` is an integer, `a == b` is true if the truncated floating point value is equal to the integer value, and false otherwise.
+
+*Booleans*: If `a` and `b` are both booleans, `a == b` is true if the operands represent the same boolean, and false otherwise.
+
+*Strings:* If `a` and `b` are both strings, `a == b` is true if the length of the strings are equal and the contents are also equal. If the length comparison fails, `a == b` will be false regardless of the contents of `a` and `b`.
+
+*Lists*: If `a` and `b` are both lists, `a == b` is true if the length of the lists is equal and the elements, including their order, are also equal. Effectively, for each element a~n~ and b~n~, if a~n~ is distinct from b~n~, then `a == b` is false. If all elements of a and b are equal, `a == b` is true.
+
+*Mappings*: If `a` and `b` are both mappings, `a == b` is true if the amount of keys in the mappings are equal, the mappings contain the same keys (both type and value wise), and the values of each key are the same. The order of the elements is not considered in the comparison.
+
+Effectively, for each element a~key~ and a~value~, b~key~ and b~value~, if a~key~ is distinct from b~key~, then the mappings are assumed to be distinct. If both keys are equal, then if a~value~ is distinct from b~value~, then the mappings are distinct. If all elements of this comparison are true, the mappings are assumed to be equal.
+
+==== Less than, greater than, and their equality variants
+
+The operators `<` and `>` report whether an operand `a` is less than or greater than an operand `b`, respectively. Their variants `<=` and `>=` add an equality component and practically resolve to `a < b || a == b` and `a > b || a == b`.
+
+The only types implementing this kind of comparison are integers, floats, and strings. If one of the operands of the comparison is not part of this list, an error shall be raised.
+
+*Numbers:* If `a` and `b` are both integers or both floats, `a < b` is true if the numeric value of `a` is lower than the numeric value of `b`. Likewise, `a > b` is true if `a` is numerically greater than `b`.
+
+In the case that `a` is a float and `b` is an integer, this comparison will be performed using the truncated floating point value as an integer and the other integer value.
+
+*Strings:* If `a` and `b` are both strings, `a < b` is true if `len(a) < len(b)` and, for each element a~n~ and b~n~, the code point value of a~n~ is less than the code point value of b~n~. Similar to equality, a short circuit occurs when `len(a) < len(b)`; in which case, `a < b` is true regardless of the contents of `a` and `b`.
+
+This same process occurs with `a > b` where the result is true if `len(a) > len(b)` and the code point value of a~n~ is greater than the one of b~n~.
+
+=== Logical and (`&&`) and or (`||`)
+
+Logical and (`&&`) determines whether two operands `a` and `b` are _truthy_. On the other hand, logical or (`||`) determines whether either of its operands `a` and `b` are _truthy_.
+
+A value is considered truthy when:
+
+- If boolean, the boolean value is `true`.
+- If integer or float, the numeric value is not zero.
+- If string, the sequence contains at least one character.
+- If list, the sequence contains at least one element.
+- If mapping, the sequence contains at least one key-value pair.
+
+A value is considered falsy if it does not meet either of the above conditions.
+
+For `a || b`, if `a` is truthy, then `b` is not computed and the result is immediately true. For `a && b`, if `a` is falsy, then `b` is not computed and the result is immediately false.
+
+=== Operator Precedence
+
+From most to least precedence:
+
+- Groupings (`(expr)`) and literals
+- Unary plus (`+x`), unary minus (`-x`), unary bitwise complement (`~x`).
+- Exponentiation (`**`)
+- Multiplication (`*`), division (`/`), remainder (`%`), bitwise left (`<<`), bitwise right (`>>`), bitwise and (`&`)
+- Addition (`+`), subtraction (`-`), bitwise or (`|`), bitwise exclusive or (`^`)
+- Equal to (`==`), not equal to (`==`), less than (`<`), less than or equal to (`<=`), greater than (`>`), greater than or equal to (`>=`)
+- Logical and (`&&`)
+- Logical or (`||`)
+
+== The BinDef Document
+
+A BinDef document contains a single mapping describing the binary definition. It is recommended that authors use the `.bdf` extension, and if defining a media or MIME type is required, BinDef recommends the `text/x-bindef` media type.
+
+For all BinDef defined mappings, it is required that the keys are identifiers.
+
+The single mapping in the document contains two keys `meta` and `binary`. `meta` contains metadata or details of the format being described. `binary` contains the structured description of the format.
+
+=== The `meta` key
+
+`meta` is a mapping containing metadata of the format being described. The keys that the `meta` mapping may contain are:
+
+[cols="1,1,2"]
+|====
+|Key |Data Type |Value
+
+|bdf 
+|string    
+|(required) The minimum BinDef version required to parse the file. This string must be in the format specified in <<Versioning>>.
+
+|name
+|string
+|(required) The common name given to the format being described, e.g. "Binary Definition (BinDef) file".
+
+|mime
+|list of strings
+|(required) The media or MIME types assigned to the described format. If multiple are listed, they should be listed in descending order of preference.
+
+|exts
+|list of strings
+|(required) The file extensions commonly used for this format. If multiple are listed, they should be listed in descending order of preference. The extensions should contain a leading period.
+
+|doc
+|string
+|(optional) Details regarding the described format. The information that goes here is the decision of the author, but generally, it should describe the format's purpose, creator(s), and basic structure, and contain links to technical references or specifications.
+|====
+
+=== The `binary` key
+
+`binary` is a list of mappings describing the format structure.
+
+Each mapping in the `binary` list is a _format type_. All format types must contain the `type` key whose value is an identifier for a type.
+
+The currently available types are
+
+- The file signature type `magic`.
+- The unsigned integer types `uint8`, `uint16`, `uint32`, and `uint64`.
+- The signed integer types `int8`, `int16`, `int32`, and `int64`.
+- The `byte[n]` type.
+
+If a BinDef processor finds a type that it doesn't recognize, it shall stop parsing the document and issue a warning.
+
+== Format types
+
+All format types share five keys: `type`, `id`, `name`, `doc`, and `at`. 
+
+All format types must have a `type` key with an identifier for the format type being used. This also determines whether additional keys may be specified.
+
+The `id` key whose value is an identifier may be used to identify the value being described. An identifier starting with `_` is considered private and will not appear in the extracted output.
+
+The `name` and `doc` keys provide optional documentation for a field. The `name` key is a string intended as a human-readable name of the field. The `doc` key is designed to provide additional information on the purpose of the field or possible values.
+
+`at` is an optional key that may contain either an integer or a list of at two items.
+
+* The first item is an integer specifying a byte offset. 
+* The second item is either of the following string values:
++ 
+  ** `"start"` means the byte offset is relative to the start of the file (the start being byte offset 0).
+  ** `"current"` means the byte offset is relative to the current position within the file.
+  ** `"end"` means the byte offset is relative to the end of the file.
+
+You may notice that the contents of the `at` key resemble the arguments to a `seek()` function. In essence, `at` performs a *seek operation* before reading the type value.
+
+If `at` is not specified, the current position will be relative to the position of the previously read token. If no token was previously read, the position assumed is 0. `{at: 0}` implies `{at: [0, "current"]}`.
+
+=== The `magic` type
+
+The `magic` type provides a simple way to match file signatures or https://en.wikipedia.org/wiki/File_format#Magic_number[magic numbers]. If the contents specified in the magic type are not matched, then it is safe to assume that the definition will not successfully parse the format.
+
+Alongside the common format type keys, the `magic` type requires an additional `match` key. The `match` key may be either a string including the content to match or a list of strings to match where, if one match fails, the next string is matched until either all strings are exhausted or one of the strings is matched successfully.
+
+For example, this would attempt to match the value `PK\x03\x04` (magic number for the ZIP file format) at position 0.
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: magic, match: "PK\x03\x04" }
+  ]
+}
+----
+
+The GIF format uses two magic numbers depending on the version: `GIF87a` and `GIF89a`. A type matching those values would be:
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: magic, match: ["GIF87a", "GIF89a"] }
+  ]
+}
+----
+
+=== Unsigned & signed integer types
+
+The types `uint8`, `uint16`, `uint32`, and `uint64` are used for parsing unsigned integers with those bit sizes. Their signed equivalents are `int8`, `int16`, `int32`, and `int64`.
+
+These types must contain an `endian` key specifying either the string "little" or the string "big". This tells BinDef to read the integer in little endian or big endian byte order, respectively. An exception is made for `int8` and `uint8` where specifying a byte endianness is redundant.
+
+=== The `byte[n]` type
+
+`byte[n]` tells BinDef to read an arbitrary string that is `n` bytes long.
+
+For example, the Extended Module (xm) format used by some https://en.wikipedia.org/wiki/Music_tracker[music trackers] specifies a 20-byte "module name" at offset 17.
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: magic, match: ["Extended Module: "]},
+    { type: byte[20], id: moduleName, name: "Module name" }
+  ]
+}
+----
+
+As this is a fixed-size string, it is likely padded with whitespace or null bytes in order to fit the size. To remove this padding from the final output, you may specify the `strip` key which is a boolean specifying whether the leading and trailing whitespace of the string must be trimmed.
+
+In the XM format, module names are padded by null bytes or spaces. So, to only get the meaningful part of the string, you can do:
+
+[source,javascript]
+----
+{ type: byte[20], id: moduleName, name: "Module name", strip: true }
+----
+
+Of course, the length of the byte sequence may also be fetched from another identifier. This is useful for type-length-value structures which are fairly common in binary formats.
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: uint16,     id: type, endian: "little" },
+    { type: uint16,     id: size, endian: "little" },
+    { type: byte[size], id: data }
+  ]
+}
+----
+
+The provided `size` must be a numeric type. If the numeric type is a float, the decimal part is converted to an integer.
+
+== Versioning
+
+BinDef versions follow the `X.Y` format where `X` is the major version and `Y` is the minor version. 
+
+The **major version** is incremented by 1 when a _breaking change_ occurs, that is, a change that may break compatibility with a BinDef processor supporting an older major version. For example, new syntax or removal of a field would constitute a major version increase.  
+
+The **minor version** is incremented by 1 when a _backwards compatible change_ occurs, that is, a change that does not affect compatibility with a BinDef processor supporting the same major version but an older minor version. Minor versions are usually small revisions and patches, deprecations, or new features that don't break syntax.
+
+A special exception to this is when the major version is zero; in such case, the minor version should be treated as the major version. No compatibility guarantees are made between `0.X` releases.
+
+When the major version is incremented, the minor version resets to 0. 
+
+When a BinDef processor encounters a document specifying a greater major version than it can process, it shall raise an error. When a BinDef processor encounters a document specifying a greater minor version than it expects, it shall continue parsing the document but may raise a warning if appropriate.

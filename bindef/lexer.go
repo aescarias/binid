@@ -35,7 +35,7 @@ const (
 	TokenBitwiseXor                    // ^
 	TokenBitwiseLeft                   // >>
 	TokenBitwiseRight                  // <<
-	TokenModulo                        // %
+	TokenRemainder                     // %
 	TokenNot                           // !
 	TokenNotEq                         // !=
 	TokenLogicalAnd                    // &&
@@ -46,12 +46,6 @@ const (
 	TokenFloat
 	TokenString
 )
-
-var TypeNames = []string{
-	"bool", "byte",
-	"uint8", "uint16", "uint32", "uint64",
-	"int8", "int16", "int32", "int64",
-}
 
 func (t TokenKind) String() string {
 	switch t {
@@ -105,8 +99,8 @@ func (t TokenKind) String() string {
 		return "BitwiseLeft"
 	case TokenBitwiseRight:
 		return "BitwiseRight"
-	case TokenModulo:
-		return "Modulo"
+	case TokenRemainder:
+		return "Remainder"
 	case TokenNot:
 		return "Not"
 	case TokenNotEq:
@@ -185,7 +179,7 @@ func IsIdentifier(ch byte) bool {
 
 // IsStartOfIdentifier reports whether a character ch can be the start of a valid identifier.
 func IsStartOfIdentifier(ch byte) bool {
-	return IsASCIILetter(ch) && !IsDecimalDigit(ch) && ch != '-'
+	return (IsASCIILetter(ch) || ch == '_') && !IsDecimalDigit(ch) && ch != '-'
 }
 
 type Position struct {
@@ -306,10 +300,10 @@ func (lx *Lexer) LexString(delimiter byte) (Token, error) {
 			if nc == 'x' {
 				const byteSize int = 2
 				hexSeq := string(lx.Peek(byteSize))
-				hexVal, err := strconv.ParseInt(hexSeq, 16, 8)
+				hexVal, err := strconv.ParseInt(hexSeq, 16, 16)
 				if err != nil {
 					return Token{}, LangError{
-						Position{escapeStart, lx.Position + byteSize},
+						Position{escapeStart, lx.Position + byteSize + 1},
 						fmt.Sprintf("invalid hex sequence %s", hexSeq),
 					}
 				}
@@ -377,7 +371,7 @@ var singleTokenMap = map[byte]TokenKind{
 	'+': TokenPlus,
 	'-': TokenMinus,
 	'!': TokenNot,
-	'%': TokenModulo,
+	'%': TokenRemainder,
 	'^': TokenBitwiseXor,
 	'~': TokenBitwiseNot,
 }

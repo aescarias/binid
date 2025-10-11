@@ -3,168 +3,233 @@ package bindef
 import (
 	"fmt"
 	"math"
+	"math/big"
+	"slices"
 	"strconv"
 )
 
-type ResultKind string
-
-const (
-	ResultInt     ResultKind = "Int"
-	ResultFloat   ResultKind = "Float"
-	ResultBoolean ResultKind = "Boolean"
-	ResultMap     ResultKind = "Map"
-	ResultList    ResultKind = "List"
-	ResultString  ResultKind = "String"
-	ResultIdent   ResultKind = "Identifier"
-	ResultLazy    ResultKind = "Lazy"
-)
-
-type Result struct {
-	Kind  ResultKind
-	Value any
-}
-
-type Namespace map[Result]Result
-
+// EvaluateBinOp evaluates a binary operation node using namespace.
 func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 	left, err := Evaluate(node.Left, namespace)
 	if err != nil {
-		return Result{}, err
+		return nil, err
 	}
 
 	right, err := Evaluate(node.Right, namespace)
 	if err != nil {
-		return Result{}, err
+		return nil, err
 	}
 
 	switch node.Op.Kind {
 	case TokenPlus:
-		if left.Kind == ResultInt && right.Kind == ResultInt {
-			return Result{Kind: ResultInt, Value: left.Value.(int) + right.Value.(int)}, nil
-		} else if left.Kind == ResultFloat && right.Kind == ResultFloat {
-			return Result{Kind: ResultFloat, Value: left.Value.(float64) + right.Value.(float64)}, nil
-		} else if left.Kind == ResultFloat && right.Kind == ResultInt {
-			rightFloat := float64(right.Value.(int))
-			return Result{Kind: ResultFloat, Value: left.Value.(float64) + rightFloat}, nil
-		} else if left.Kind == ResultInt && right.Kind == ResultFloat {
-			leftFloat := float64(left.Value.(int))
-			return Result{Kind: ResultFloat, Value: leftFloat + right.Value.(float64)}, nil
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			return IntegerResult{new(big.Int).Add(left.(IntegerResult).Int, right.(IntegerResult).Int)}, nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
+			return left.(FloatResult) + right.(FloatResult), nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
+			rightFloat, _ := right.(IntegerResult).Float64()
+			return left.(FloatResult) + FloatResult(rightFloat), nil
+		} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
+			leftFloat, _ := left.(IntegerResult).Float64()
+			return FloatResult(leftFloat) + right.(FloatResult), nil
+		} else if left.Kind() == ResultString && right.Kind() == ResultString {
+			return left.(StringResult) + right.(StringResult), nil
 		}
 
-		return Result{}, LangError{
+		return nil, LangError{
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
-				node.Op.Value, left.Kind, right.Kind),
+				node.Op.Value, left.Kind(), right.Kind()),
 		}
 	case TokenMinus:
-		if left.Kind == ResultInt && right.Kind == ResultInt {
-			return Result{Kind: ResultInt, Value: left.Value.(int) - right.Value.(int)}, nil
-		} else if left.Kind == ResultFloat && right.Kind == ResultFloat {
-			return Result{Kind: ResultFloat, Value: left.Value.(float64) - right.Value.(float64)}, nil
-		} else if left.Kind == ResultFloat && right.Kind == ResultInt {
-			rightFloat := float64(right.Value.(int))
-			return Result{Kind: ResultFloat, Value: left.Value.(float64) - rightFloat}, nil
-		} else if left.Kind == ResultInt && right.Kind == ResultFloat {
-			leftFloat := float64(left.Value.(int))
-			return Result{Kind: ResultFloat, Value: leftFloat - right.Value.(float64)}, nil
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			return IntegerResult{new(big.Int).Sub(left.(IntegerResult).Int, right.(IntegerResult).Int)}, nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
+			return left.(FloatResult) - right.(FloatResult), nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
+			rightFloat, _ := right.(IntegerResult).Float64()
+			return left.(FloatResult) - FloatResult(rightFloat), nil
+		} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
+			leftFloat, _ := left.(IntegerResult).Float64()
+			return FloatResult(leftFloat) - right.(FloatResult), nil
 		}
 
-		return Result{}, LangError{
+		return nil, LangError{
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
-				node.Op.Value, left.Kind, right.Kind),
+				node.Op.Value, left.Kind(), right.Kind()),
 		}
 	case TokenMul:
-		if left.Kind == ResultInt && right.Kind == ResultInt {
-			return Result{Kind: ResultInt, Value: left.Value.(int) * right.Value.(int)}, nil
-		} else if left.Kind == ResultFloat && right.Kind == ResultFloat {
-			return Result{Kind: ResultFloat, Value: left.Value.(float64) * right.Value.(float64)}, nil
-		} else if left.Kind == ResultFloat && right.Kind == ResultInt {
-			rightFloat := float64(right.Value.(int))
-			return Result{Kind: ResultFloat, Value: left.Value.(float64) * rightFloat}, nil
-		} else if left.Kind == ResultInt && right.Kind == ResultFloat {
-			leftFloat := float64(left.Value.(int))
-			return Result{Kind: ResultFloat, Value: leftFloat * right.Value.(float64)}, nil
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			return IntegerResult{new(big.Int).Mul(left.(IntegerResult).Int, right.(IntegerResult).Int)}, nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
+			return left.(FloatResult) * right.(FloatResult), nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
+			rightFloat, _ := right.(IntegerResult).Float64()
+			return left.(FloatResult) * FloatResult(rightFloat), nil
+		} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
+			leftFloat, _ := left.(IntegerResult).Float64()
+			return FloatResult(leftFloat) * right.(FloatResult), nil
 		}
 
-		return Result{}, LangError{
+		return nil, LangError{
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
-				node.Op.Value, left.Kind, right.Kind),
+				node.Op.Value, left.Kind(), right.Kind()),
+		}
+	case TokenPow:
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			leftFloat, _ := left.(IntegerResult).Float64()
+			rightFloat, _ := right.(IntegerResult).Float64()
+
+			pow := math.Pow(leftFloat, rightFloat)
+
+			if pow != math.Trunc(pow) {
+				return FloatResult(pow), nil
+			}
+
+			return IntegerResult{new(big.Int).SetInt64(int64(pow))}, nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
+			return FloatResult(math.Pow(float64(left.(FloatResult)), float64(right.(FloatResult)))), nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
+			rightFloat, _ := right.(IntegerResult).Float64()
+			return FloatResult(math.Pow(float64(left.(FloatResult)), rightFloat)), nil
+		} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
+			leftFloat, _ := left.(IntegerResult).Float64()
+			return FloatResult(math.Pow(leftFloat, float64(right.(FloatResult)))), nil
+		}
+
+		return nil, LangError{
+			node.Position(),
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+				node.Op.Value, left.Kind(), right.Kind()),
 		}
 	case TokenDiv:
-		if left.Kind == ResultInt && right.Kind == ResultInt {
-			if right.Value.(int) == 0 {
-				return Result{}, LangError{node.Position(), "integer division by zero"}
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			leftFloat, _ := left.(IntegerResult).Float64()
+			rightFloat, _ := right.(IntegerResult).Float64()
+
+			if rightFloat == 0 {
+				return nil, LangError{node.Position(), "division by zero"}
 			}
 
-			return Result{Kind: ResultInt, Value: left.Value.(int) / right.Value.(int)}, nil
-		} else if left.Kind == ResultFloat && right.Kind == ResultFloat {
-			if right.Value.(float64) == 0 {
-				return Result{}, LangError{node.Position(), "float division by zero"}
+			return FloatResult(leftFloat / rightFloat), nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
+			if right.(FloatResult) == 0 {
+				return nil, LangError{node.Position(), "division by zero"}
 			}
 
-			return Result{Kind: ResultFloat, Value: left.Value.(float64) / right.Value.(float64)}, nil
-		} else if left.Kind == ResultFloat && right.Kind == ResultInt {
-			rightFloat := float64(right.Value.(int))
+			return left.(FloatResult) / right.(FloatResult), nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
+			rightFloat, _ := right.(IntegerResult).Float64()
 			if rightFloat == 0.0 {
-				return Result{}, LangError{node.Position(), "float division by zero"}
+				return nil, LangError{node.Position(), "division by zero"}
 			}
 
-			return Result{Kind: ResultFloat, Value: left.Value.(float64) / rightFloat}, nil
-		} else if left.Kind == ResultInt && right.Kind == ResultFloat {
-			leftFloat := float64(left.Value.(int))
-			if right.Value.(float64) == 0.0 {
-				return Result{}, LangError{node.Position(), "float division by zero"}
+			return left.(FloatResult) / FloatResult(rightFloat), nil
+		} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
+			leftFloat, _ := left.(IntegerResult).Float64()
+			if right.(FloatResult) == 0.0 {
+				return nil, LangError{node.Position(), "division by zero"}
 			}
 
-			return Result{Kind: ResultFloat, Value: leftFloat / right.Value.(float64)}, nil
+			return FloatResult(leftFloat) / right.(FloatResult), nil
 		}
 
-		return Result{}, LangError{
+		return nil, LangError{
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
-				node.Op.Value, left.Kind, right.Kind),
+				node.Op.Value, left.Kind(), right.Kind()),
 		}
-	case TokenModulo:
-		if left.Kind == ResultInt && right.Kind == ResultInt {
-			if right.Value.(int) == 0 {
-				return Result{}, LangError{node.Position(), "integer modulo by zero"}
+	case TokenRemainder:
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			if right.(IntegerResult).Int == big.NewInt(0) {
+				return nil, LangError{node.Position(), "integer remainder by zero"}
 			}
 
-			return Result{Kind: ResultInt, Value: left.Value.(int) % right.Value.(int)}, nil
-		} else if left.Kind == ResultFloat && right.Kind == ResultFloat {
-			if right.Value.(float64) == 0 {
-				return Result{}, LangError{node.Position(), "float modulo by zero"}
+			return IntegerResult{new(big.Int).Rem(left.(IntegerResult).Int, right.(IntegerResult).Int)}, nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
+			if right.(FloatResult) == 0 {
+				return nil, LangError{node.Position(), "float remainder by zero"}
 			}
 
-			mod := math.Mod(left.Value.(float64), right.Value.(float64))
-			return Result{Kind: ResultFloat, Value: mod}, nil
-		} else if left.Kind == ResultFloat && right.Kind == ResultInt {
-			rightFloat := float64(right.Value.(int))
+			rem := math.Remainder(float64(left.(FloatResult)), float64(right.(FloatResult)))
+			return FloatResult(rem), nil
+		} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
+			rightFloat, _ := right.(IntegerResult).Float64()
 			if rightFloat == 0.0 {
-				return Result{}, LangError{node.Position(), "float modulo by zero"}
+				return nil, LangError{node.Position(), "float modulo by zero"}
 			}
 
-			mod := math.Mod(left.Value.(float64), rightFloat)
-			return Result{Kind: ResultFloat, Value: mod}, nil
-		} else if left.Kind == ResultInt && right.Kind == ResultFloat {
-			leftFloat := float64(left.Value.(int))
-			if right.Value.(float64) == 0.0 {
-				return Result{}, LangError{node.Position(), "float modulo by zero"}
+			rem := math.Remainder(float64(left.(FloatResult)), rightFloat)
+			return FloatResult(rem), nil
+		} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
+			leftFloat, _ := left.(IntegerResult).Float64()
+			if right.(FloatResult) == 0.0 {
+				return nil, LangError{node.Position(), "float modulo by zero"}
 			}
 
-			mod := math.Mod(leftFloat, right.Value.(float64))
-			return Result{Kind: ResultFloat, Value: mod}, nil
+			rem := math.Remainder(leftFloat, float64(right.(FloatResult)))
+			return FloatResult(rem), nil
 		}
 
-		return Result{}, LangError{
+		return nil, LangError{
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
-				node.Op.Value, left.Kind, right.Kind),
+				node.Op.Value, left.Kind(), right.Kind()),
+		}
+	case TokenBitwiseLeft:
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			return IntegerResult{new(big.Int).Lsh(left.(IntegerResult).Int, uint(right.(IntegerResult).Int.Uint64()))}, nil
+		}
+
+		return nil, LangError{
+			node.Position(),
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+				node.Op.Value, left.Kind(), right.Kind()),
+		}
+	case TokenBitwiseRight:
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			return IntegerResult{new(big.Int).Rsh(left.(IntegerResult).Int, uint(right.(IntegerResult).Int.Uint64()))}, nil
+		}
+
+		return nil, LangError{
+			node.Position(),
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+				node.Op.Value, left.Kind(), right.Kind()),
+		}
+	case TokenBitwiseAnd:
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			return IntegerResult{new(big.Int).And(left.(IntegerResult).Int, right.(IntegerResult).Int)}, nil
+		}
+
+		return nil, LangError{
+			node.Position(),
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+				node.Op.Value, left.Kind(), right.Kind()),
+		}
+	case TokenBitwiseOr:
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			return IntegerResult{new(big.Int).Or(left.(IntegerResult).Int, right.(IntegerResult).Int)}, nil
+		}
+
+		return nil, LangError{
+			node.Position(),
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+				node.Op.Value, left.Kind(), right.Kind()),
+		}
+	case TokenBitwiseXor:
+		if left.Kind() == ResultInt && right.Kind() == ResultInt {
+			return IntegerResult{new(big.Int).Xor(left.(IntegerResult).Int, right.(IntegerResult).Int)}, nil
+		}
+
+		return nil, LangError{
+			node.Position(),
+			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+				node.Op.Value, left.Kind(), right.Kind()),
 		}
 	default:
-		return Result{}, LangError{
+		return nil, LangError{
 			node.Position(),
 			fmt.Sprintf("behavior undefined for binary operation %s", node.Op.Value),
 		}
@@ -176,54 +241,54 @@ func EvaluateUnaryOp(node UnaryOpNode, namespace Namespace) (Result, error) {
 	case TokenPlus:
 		result, err := Evaluate(node.Node, namespace)
 		if err != nil {
-			return Result{}, err
+			return nil, err
 		}
 
-		switch result.Kind {
+		switch result.Kind() {
 		case ResultInt:
-			return Result{Kind: ResultInt, Value: result.Value.(int)}, nil
+			return result.(IntegerResult), nil
 		case ResultFloat:
-			return Result{Kind: ResultFloat, Value: result.Value.(float64)}, nil
+			return result.(FloatResult), nil
 		default:
-			return Result{}, LangError{
+			return nil, LangError{
 				node.Position(),
-				fmt.Sprintf("%s does not support unary operation %s", result.Kind, node.Op.Value),
+				fmt.Sprintf("%s does not support unary operation %s", result.Kind(), node.Op.Value),
 			}
 		}
 	case TokenMinus:
 		result, err := Evaluate(node.Node, namespace)
 		if err != nil {
-			return Result{}, err
+			return nil, err
 		}
 
-		switch result.Kind {
+		switch result.Kind() {
 		case ResultInt:
-			return Result{Kind: ResultInt, Value: -result.Value.(int)}, nil
+			return IntegerResult{new(big.Int).Neg(result.(IntegerResult).Int)}, nil
 		case ResultFloat:
-			return Result{Kind: ResultFloat, Value: -result.Value.(float64)}, nil
+			return -result.(FloatResult), nil
 		default:
-			return Result{}, LangError{
+			return nil, LangError{
 				node.Position(),
-				fmt.Sprintf("%s does not support unary operation %s", result.Kind, node.Op.Value),
+				fmt.Sprintf("%s does not support unary operation %s", result.Kind(), node.Op.Value),
 			}
 		}
 	case TokenBitwiseNot:
 		result, err := Evaluate(node.Node, namespace)
 		if err != nil {
-			return Result{}, err
+			return nil, err
 		}
 
-		switch result.Kind {
+		switch result.Kind() {
 		case ResultInt:
-			return Result{Kind: ResultInt, Value: ^result.Value.(int)}, nil
+			return IntegerResult{new(big.Int).Not(result.(IntegerResult).Int)}, nil
 		default:
-			return Result{}, LangError{
+			return nil, LangError{
 				node.Position(),
-				fmt.Sprintf("%s does not support unary operation %s", result.Kind, node.Op.Value),
+				fmt.Sprintf("%s does not support unary operation %s", result.Kind(), node.Op.Value),
 			}
 		}
 	default:
-		return Result{}, LangError{
+		return nil, LangError{
 			node.Position(),
 			fmt.Sprintf("undefined binary operation %s", node.Op.Value),
 		}
@@ -233,30 +298,33 @@ func EvaluateUnaryOp(node UnaryOpNode, namespace Namespace) (Result, error) {
 func EvaluateLiteral(node LiteralNode, ns Namespace) (Result, error) {
 	switch node.Token.Kind {
 	case TokenInteger:
-		number, err := strconv.ParseInt(node.Token.Value, 0, 0)
-		if err != nil {
-			return Result{}, LangError{
-				node.Position(),
-				fmt.Sprintf("invalid integer literal: %s", err),
-			}
+		number := new(big.Int)
+		if _, ok := number.SetString(node.Token.Value, 0); !ok {
+			return nil, LangError{node.Position(), "invalid integer literal"}
 		}
-		return Result{Kind: ResultInt, Value: int(number)}, nil
+
+		return IntegerResult{number}, nil
 	case TokenFloat:
 		number, err := strconv.ParseFloat(node.Token.Value, 64)
 		if err != nil {
-			return Result{}, LangError{
+			return nil, LangError{
 				node.Position(),
 				fmt.Sprintf("invalid float literal: %s", err),
 			}
 		}
-		return Result{Kind: ResultFloat, Value: number}, nil
+
+		return FloatResult(number), nil
 	case TokenIdentifier:
-		ident := Result{Kind: ResultIdent, Value: node.Token.Value}
+		if tp := TypeName(node.Token.Value); slices.Contains(AvailableTypeNames, tp) {
+			return TypeResult{Name: tp, Params: []Result{}}, nil
+		}
+
+		ident := IdentResult(node.Token.Value)
 
 		if ns != nil {
 			value, ok := ns[ident]
 			if !ok {
-				return Result{}, LangError{
+				return nil, LangError{
 					node.Position(),
 					fmt.Sprintf("%q is not defined", node.Token.Value),
 				}
@@ -268,19 +336,19 @@ func EvaluateLiteral(node LiteralNode, ns Namespace) (Result, error) {
 	case TokenKeyword:
 		switch val := node.Token.Value; val {
 		case string(KeywordTrue):
-			return Result{Kind: ResultBoolean, Value: true}, nil
+			return BooleanResult(true), nil
 		case string(KeywordFalse):
-			return Result{Kind: ResultBoolean, Value: false}, nil
+			return BooleanResult(false), nil
 		default:
-			return Result{}, LangError{
+			return nil, LangError{
 				node.Position(),
 				fmt.Sprintf("unknown keyword %q", val),
 			}
 		}
 	case TokenString:
-		return Result{Kind: ResultString, Value: node.Token.Value}, nil
+		return StringResult(node.Token.Value), nil
 	default:
-		return Result{}, LangError{
+		return nil, LangError{
 			node.Position(),
 			fmt.Sprintf("evaluation undefined for literal type %s", node.Token.Kind),
 		}
@@ -293,31 +361,30 @@ func EvaluateMap(node MapNode, namespace Namespace) (Result, error) {
 	for key, val := range node.Items {
 		keyRes, err := Evaluate(key, namespace)
 		if err != nil {
-			return Result{}, err
+			return nil, err
 		}
 
 		lazy, err := MustEvaluateLazily(val)
 		if err != nil {
-			return Result{}, err
+			return nil, err
 		}
 
 		var valueRes Result
 		if lazy {
-			valueRes = Result{
-				Kind:  ResultLazy,
-				Value: func(ns Namespace) (Result, error) { return Evaluate(val, ns) },
-			}
+			valueRes = LazyResult(
+				func(ns Namespace) (Result, error) { return Evaluate(val, ns) },
+			)
 		} else {
 			valueRes, err = Evaluate(val, namespace)
 			if err != nil {
-				return Result{}, err
+				return nil, err
 			}
 		}
 
 		items[keyRes] = valueRes
 	}
 
-	return Result{Kind: ResultMap, Value: items}, nil
+	return MapResult(items), nil
 }
 
 func EvaluateList(node ListNode, namespace Namespace) (Result, error) {
@@ -326,37 +393,36 @@ func EvaluateList(node ListNode, namespace Namespace) (Result, error) {
 	for _, val := range node.Items {
 		lazy, err := MustEvaluateLazily(val)
 		if err != nil {
-			return Result{}, err
+			return nil, err
 		}
 
 		var valRes Result
 		if lazy {
-			valRes = Result{
-				Kind:  ResultLazy,
-				Value: func(ns Namespace) (Result, error) { return Evaluate(val, ns) },
-			}
+			valRes = LazyResult(
+				func(ns Namespace) (Result, error) { return Evaluate(val, ns) },
+			)
 		} else {
 			valRes, err = Evaluate(val, namespace)
 			if err != nil {
-				return Result{}, err
+				return nil, err
 			}
 		}
 
 		items = append(items, valRes)
 	}
 
-	return Result{Kind: ResultList, Value: items}, nil
+	return ListResult(items), nil
 }
 
-func EvaluateAttr(node AttrNode, namespace Namespace) (Result, error) {
+func EvaluateSubscript(node SubscriptNode, namespace Namespace) (Result, error) {
 	expr, err := Evaluate(node.Expr, namespace)
 	if err != nil {
-		return Result{}, err
+		return nil, err
 	}
 
-	attr, err := Evaluate(node.Attr, nil)
+	item, err := Evaluate(node.Item, namespace)
 	if err != nil {
-		return Result{}, err
+		return nil, err
 	}
 
 	var (
@@ -364,28 +430,96 @@ func EvaluateAttr(node AttrNode, namespace Namespace) (Result, error) {
 		ok    bool
 	)
 
-	switch expr.Kind {
+	switch expr.Kind() {
 	case ResultIdent:
-		value, ok = namespace[attr]
+		value, ok = namespace[item]
 	case ResultMap:
-		value, ok = expr.Value.(map[Result]Result)[attr]
-	default:
-		return Result{}, LangError{
+		value, ok = expr.(MapResult)[item]
+	case ResultType:
+		typeRes := expr.(TypeResult)
+
+		if typeRes.Name == TypeByte {
+			return TypeResult{Name: TypeByte, Params: []Result{item}}, nil
+		}
+
+		return nil, LangError{
 			node.Position(),
-			fmt.Sprintf("object of type %s does not support attribute access", expr.Kind),
+			fmt.Sprintf("type %s does not allow type parameters", typeRes.Name),
+		}
+	case ResultList:
+		valueRes := expr.(ListResult)
+
+		if item.Kind() != ResultInt {
+			return nil, LangError{
+				node.Position(),
+				fmt.Sprintf("list indices must be %s, not %s", ResultInt, item.Kind()),
+			}
+		}
+
+		intVal := item.(IntegerResult).Int64()
+		if intVal >= int64(len(valueRes)) {
+			return nil, LangError{node.Position(), "index out of bounds"}
+		}
+
+		value = valueRes[intVal]
+		ok = true
+	default:
+		return nil, LangError{
+			node.Position(),
+			fmt.Sprintf("object of type %s does not support subscript access", expr.Kind()),
 		}
 	}
 
 	if !ok {
-		return Result{}, LangError{
+		return nil, LangError{
 			node.Position(),
-			fmt.Sprintf("object of type %s does not have a member named %q", expr.Kind, attr.Value),
+			fmt.Sprintf("object of type %s does not have a member or key named %v", expr.Kind(), item),
 		}
 	}
 
 	return value, nil
 }
 
+func EvaluateAttr(node AttrNode, namespace Namespace) (Result, error) {
+	expr, err := Evaluate(node.Expr, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	attr, err := Evaluate(node.Attr, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		value Result
+		ok    bool
+	)
+
+	switch expr.Kind() {
+	case ResultIdent:
+		value, ok = namespace[attr]
+	case ResultMap:
+		value, ok = expr.(MapResult)[attr]
+	default:
+		return nil, LangError{
+			node.Position(),
+			fmt.Sprintf("object of type %s does not support attribute access", expr.Kind()),
+		}
+	}
+
+	if !ok {
+		return nil, LangError{
+			node.Position(),
+			fmt.Sprintf("object of type %s does not have a member named %v", expr.Kind(), attr),
+		}
+	}
+
+	return value, nil
+}
+
+// Evaluate evaluates the result of node tree using namespace and returns the result
+// and an error if any occurred.
 func Evaluate(tree Node, namespace Namespace) (Result, error) {
 	switch tree.Type() {
 	case NodeBinOp:
@@ -400,8 +534,10 @@ func Evaluate(tree Node, namespace Namespace) (Result, error) {
 		return EvaluateAttr(*tree.(*AttrNode), namespace)
 	case NodeList:
 		return EvaluateList(*tree.(*ListNode), namespace)
+	case NodeSubscript:
+		return EvaluateSubscript(*tree.(*SubscriptNode), namespace)
 	default:
-		return Result{}, LangError{
+		return nil, LangError{
 			tree.Position(),
 			fmt.Sprintf("evaluation undefined for type %s", tree.Type()),
 		}
@@ -450,7 +586,17 @@ func MustEvaluateLazily(node Node) (bool, error) {
 
 		return exprLazy || itemLazy, nil
 	case NodeLiteral:
-		return false, nil
+		lit := node.(*LiteralNode)
+		switch lit.Token.Kind {
+		case TokenIdentifier:
+			if tp := TypeName(lit.Token.Value); slices.Contains(AvailableTypeNames, tp) {
+				// type identifiers can be evaluated immediately.
+				return false, nil
+			}
+			return true, nil
+		default:
+			return false, nil
+		}
 	case NodeMap, NodeList:
 		// map and list may contain lazily evaluated nodes but, in general,
 		// as they're literals, they can be evaluated immediately.

@@ -1,0 +1,16 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Google Hyphenation Pattern Binary",
+    mime: [],
+    exts: [".hyb"]
+  },
+  binary: [
+    { type: magic, match: "hy\xADb" },
+    { id: version, type: uint32, endian: "little" },
+    { id: alphabetOffset, type: uint32, endian: "little" },
+    { id: trieOffset, type: uint32, endian: "little" },
+    { id: patternOffset, type: uint32, endian: "little" },
+    { id: fileSize, type: uint32, endian: "little" }
+  ]
+}

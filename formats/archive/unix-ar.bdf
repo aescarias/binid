@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "Unix ar (archive) file",
+    mime: ["application/x-archive"],
+    exts: [".ar", ".a", ".lib"]
+  },
+  binary: [
+    { type: magic, match: "!<arch>\n" }
+  ]
+}
