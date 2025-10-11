@@ -73,6 +73,22 @@ func GetDefs(path string) (map[string]bindef.Result, error) {
 	return defs, nil
 }
 
+func GetDefsPaths() (exec string, cwd string, err error) {
+	exe, err := os.Executable()
+	if err != nil {
+		return "", "", err
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", "", err
+	}
+
+	return filepath.Join(filepath.Dir(exe), "formats"),
+		filepath.Join(wd, "formats"),
+		nil
+}
+
 func main() {
 	if len(os.Args) < 2 {
 		fmt.Printf("BinID version %s\n", VERSION)
@@ -87,26 +103,38 @@ func main() {
 	}
 	defer handle.Close()
 
-	exe, err := os.Executable()
+	exePath, cwdPath, err := GetDefsPaths()
+	if err != nil {
+		fmt.Printf("failed definition lookup: %s\n", err)
+		os.Exit(1)
+	}
+
+	var defs map[string]bindef.Result
+	if defs, err = GetDefs(exePath); err != nil {
+		if defs, err = GetDefs(cwdPath); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				fmt.Printf("'formats' definition folder missing. looked in:\n  %s\n  %s\n", exePath, cwdPath)
+			} else {
+				fmt.Printf("failed to load definitions:\n%s\n", err)
+			}
+
+			os.Exit(1)
+		}
+	}
+
+	fmt.Printf("found %d definition(s)\n", len(defs))
+	if len(defs) <= 0 {
+		os.Exit(1)
+	}
+
+	inputStat, err := os.Stat(os.Args[1])
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	defsPath := filepath.Join(filepath.Dir(exe), "formats")
-
-	defs, err := GetDefs(defsPath)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			fmt.Printf("'formats' definition folder missing (looking in %s)\n", defsPath)
-		} else {
-			fmt.Printf("failed to load definitions:\n%s\n", err)
-		}
-		os.Exit(1)
-	}
-
-	fmt.Printf("found %d definition(s)\n", len(defs))
-	if len(defs) <= 0 {
+	if inputStat.IsDir() {
+		fmt.Printf("%s is a directory\n", os.Args[1])
 		os.Exit(1)
 	}
 
