@@ -10,7 +10,7 @@ BinID can be useful for finding software that can read a particular file, perfor
 
 BinID can be invoked by doing `binid [filename]` where `[filename]` is the path to the file to identify.
 
-BinID will attempt to load definitions from a `formats` folder in the directory where the command is ran. As mentioned earlier, the definitions are written in the BinDef language and end with the `.bdf` extension.
+BinID will attempt to load definitions from the `formats` folder in the directory where the executable is located. As mentioned earlier, the definitions are written in the BinDef language and end with the `.bdf` extension.
 
 If BinID is able to identify the format, it will print information such as the example below:
 

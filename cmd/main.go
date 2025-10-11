@@ -51,10 +51,10 @@ func ParseDef(filepath string) bindef.Result {
 	return result
 }
 
-func GetDefs() (map[string]bindef.Result, error) {
+func GetDefs(path string) (map[string]bindef.Result, error) {
 	defs := map[string]bindef.Result{}
 
-	err := filepath.Walk("formats", func(path string, info fs.FileInfo, err error) error {
+	err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -87,14 +87,21 @@ func main() {
 	}
 	defer handle.Close()
 
-	defs, err := GetDefs()
+	exe, err := os.Executable()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	defsPath := filepath.Join(filepath.Dir(exe), "formats")
+
+	defs, err := GetDefs(defsPath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			fmt.Println("'formats' definition folder missing")
-			os.Exit(1)
+			fmt.Printf("'formats' definition folder missing (looking in %s)\n", defsPath)
+		} else {
+			fmt.Printf("failed to load definitions:\n%s\n", err)
 		}
-
-		fmt.Printf("failed to load definitions:\n%s\n", err)
 		os.Exit(1)
 	}
 
