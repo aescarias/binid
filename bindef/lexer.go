@@ -402,7 +402,7 @@ func (lx *Lexer) Process() error {
 			switch nc := string(lx.Peek(1)); nc {
 			case "=":
 				lx.addToken(TokenEquals, string(ch)+nc)
-				lx.Advance(1)
+				lx.Advance(2)
 				continue
 			}
 		case '>':
@@ -511,6 +511,7 @@ func (lx *Lexer) Process() error {
 		}
 
 		return LangError{
+			Kind:     ErrorSyntax,
 			Position: Position{Start: lx.Position, End: lx.Position + 1},
 			Message:  fmt.Sprintf("unknown character %q", lx.Cursor()),
 		}

@@ -253,7 +253,7 @@ The following unary operators are available:
 - Unary minus (`-num`) negates the numeric value following it.
 - Unary plus (`+num`) is the same as `num` but is provided for completeness.
 - Unary tilde (`~int`) applies the _bitwise complement_ on integer `int`, i.e., inverts each bit of the integer.
-- TODO: Unary not (`!expr`) performs boolean or logical negation to its operand `expr`, converting a truthy value to false and vice versa.
+- Unary not (`!expr`) performs boolean or logical negation to its operand `expr`, converting a truthy value to false and vice versa.
 
 == Binary Operators
 
@@ -381,8 +381,6 @@ The bitwise operators defined are:
 
 === Comparison Operators
 
-WARNING: This section documents a currently unimplemented feature.
-
 Comparison operators report whether two operators are either distinct or equal to each other in some way.
 
 The operators defined are:
@@ -432,9 +430,15 @@ In the case that `a` is a float and `b` is an integer, this comparison will be p
 
 This same process occurs with `a > b` where the result is true if `len(a) > len(b)` and the code point value of a~n~ is greater than the one of b~n~.
 
-=== Logical and (`&&`) and or (`||`)
+=== Logical and (`&&`) and logical or (`||`)
 
 Logical and (`&&`) determines whether two operands `a` and `b` are _truthy_. On the other hand, logical or (`||`) determines whether either of its operands `a` and `b` are _truthy_.
+
+For `a || b`, if `a` is truthy, then `b` is not computed and the result is immediately true. 
+
+For `a && b`, if `a` is falsy, then `b` is not computed and the result is immediately false.
+
+=== Truthiness
 
 A value is considered truthy when:
 
@@ -445,8 +449,6 @@ A value is considered truthy when:
 - If mapping, the sequence contains at least one key-value pair.
 
 A value is considered falsy if it does not meet either of the above conditions.
-
-For `a || b`, if `a` is truthy, then `b` is not computed and the result is immediately true. For `a && b`, if `a` is falsy, then `b` is not computed and the result is immediately false.
 
 === Operator Precedence
 

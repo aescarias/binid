@@ -18,6 +18,6 @@
     { type: byte[6],  id: groupId,      name: "Group ID", strip: true},
     { type: byte[8],  id: fileMode,     name: "File mode (octal)", strip: true },
     { type: byte[10], id: fileSize,     name: "File size (bytes)", strip: true },
-    { type: byte[2] }
+    { type: magic, match: "\x60\x0a" }
   ]
 }

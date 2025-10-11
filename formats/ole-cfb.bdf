@@ -23,7 +23,7 @@
     // TODO: The format is usually little endian but it may be big endian if 
     // byteOrder is FE FF.
     { type: uint16,  endian: "little", id: minorVersion, name: "Minor version" },
-    { type: uint16,  endian: "little", id: majorVersion, name: "Major version"},
+    { type: uint16,  endian: "little", id: majorVersion, name: "Major version" },
     { type: byte[2], id: byteOrder,    name: "Byte order" },
     { type: uint16,  endian: "little", id: sectorSize,   name: "Sector size (bytes)"},
     { type: uint16,  endian: "little", id: shortSectorSize, name: "Short sector size (bytes)"},

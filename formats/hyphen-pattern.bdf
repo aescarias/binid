@@ -1,3 +1,6 @@
+// BinDef for Google's Hyphenation Pattern Binary (hyb) file format
+// https://android.googlesource.com/platform/frameworks/minikin/+/master/doc/hyb_file_format.md
+
 {
   meta: {
     bdf: "0.1",

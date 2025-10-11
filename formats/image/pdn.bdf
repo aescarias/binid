@@ -7,5 +7,9 @@
   },
   binary: [
     { type: magic, match: "PDN3" },
+    // TODO: The next value is a little-endian 24-bit header size followed by
+    // XML header data. After the header follows NRBF-serialized content.
+    // Hints about the format structure can be found in the pypdn source code.
+    // https://github.com/addisonElliott/pypdn/blob/master/pypdn/reader.py 
   ]
 }

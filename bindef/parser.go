@@ -137,7 +137,7 @@ func (ps *Parser) tryPostfix(left Node) (Node, error) {
 		switch ps.Cursor().Kind {
 		case TokenLBracket:
 			ps.Advance(1)
-			item, err := ps.ParseExpr()
+			item, err := ps.Parse()
 			if err != nil {
 				return nil, err
 			}
@@ -151,7 +151,7 @@ func (ps *Parser) tryPostfix(left Node) (Node, error) {
 			ps.Advance(1)
 			arguments := []Node{}
 			for !ps.IsDone() && ps.Cursor().Kind != TokenRParen {
-				arg, err := ps.ParseExpr()
+				arg, err := ps.Parse()
 				if err != nil {
 					return nil, err
 				}
@@ -191,14 +191,14 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 	case TokenPlus, TokenMinus, TokenBitwiseNot, TokenNot:
 		tok := ps.Cursor()
 		ps.Advance(1)
-		expr, err := ps.ParseExpr()
+		expr, err := ps.ParseLiteral()
 		if err != nil {
 			return nil, err
 		}
 		left = &UnaryOpNode{Op: tok, Node: expr}
 	case TokenLParen:
 		ps.Advance(1)
-		expr, err := ps.ParseExpr()
+		expr, err := ps.Parse()
 		if err != nil {
 			return nil, err
 		}
@@ -216,7 +216,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 
 		items := map[Node]Node{}
 		for !ps.IsDone() && ps.Cursor().Kind != TokenRBrace {
-			key, err := ps.ParseExpr()
+			key, err := ps.Parse()
 			if err != nil {
 				return nil, err
 			}
@@ -227,7 +227,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 			}
 			ps.Advance(1)
 
-			value, err := ps.ParseExpr()
+			value, err := ps.Parse()
 			if err != nil {
 				return nil, err
 			}
@@ -252,7 +252,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 
 		items := []Node{}
 		for !ps.IsDone() && ps.Cursor().Kind != TokenRBracket {
-			item, err := ps.ParseExpr()
+			item, err := ps.Parse()
 			if err != nil {
 				return nil, err
 			}

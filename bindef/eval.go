@@ -1,12 +1,94 @@
 package bindef
 
 import (
+	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"math/big"
 	"slices"
 	"strconv"
 )
+
+func doBinOpEquals(left, right Result) BooleanResult {
+	if left.Kind() == ResultInt && right.Kind() == ResultInt {
+		cmp := left.(IntegerResult).Cmp(right.(IntegerResult).Int)
+		return BooleanResult(cmp == 0)
+	} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
+		return BooleanResult(left.(FloatResult) == right.(FloatResult))
+	} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
+		rightFloat := float64(right.(FloatResult))
+		rightTrunc := math.Trunc(rightFloat)
+		if rightTrunc != rightFloat {
+			return BooleanResult(false)
+		}
+
+		cmp := left.(IntegerResult).Cmp(new(big.Int).SetInt64(int64(rightTrunc)))
+		return BooleanResult(cmp == 0)
+	} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
+		leftFloat := float64(left.(FloatResult))
+		leftTrunc := math.Trunc(leftFloat)
+		if leftTrunc != leftFloat {
+			return BooleanResult(false)
+		}
+
+		cmp := new(big.Int).SetInt64(int64(leftFloat)).Cmp(right.(IntegerResult).Int)
+		return BooleanResult(cmp == 0)
+	} else if left.Kind() == ResultString && right.Kind() == ResultString {
+		return BooleanResult(left.(StringResult) == right.(StringResult))
+	} else if left.Kind() == ResultBoolean && right.Kind() == ResultBoolean {
+		return BooleanResult(left.(BooleanResult) == right.(BooleanResult))
+	} else if left.Kind() == ResultList && right.Kind() == ResultList {
+		equals := slices.Equal(left.(ListResult), right.(ListResult))
+		return BooleanResult(equals)
+	} else if left.Kind() == ResultMap && right.Kind() == ResultMap {
+		equals := maps.Equal(left.(MapResult), right.(MapResult))
+		return BooleanResult(equals)
+	}
+
+	return BooleanResult(false)
+}
+
+var ErrCannotCompare = fmt.Errorf("cannot compare these types")
+var ErrCannotBoolean = fmt.Errorf("cannot convert result to boolean")
+
+func doBinOpLt(left, right Result) (BooleanResult, error) {
+	if left.Kind() == ResultInt && right.Kind() == ResultInt {
+		cmp := left.(IntegerResult).Cmp(right.(IntegerResult).Int)
+		return BooleanResult(cmp == -1), nil
+	} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
+		return BooleanResult(left.(FloatResult) < right.(FloatResult)), nil
+	} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
+		leftFloat, _ := left.(IntegerResult).Float64()
+		return BooleanResult(leftFloat < float64(right.(FloatResult))), nil
+	} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
+		rightFloat, _ := right.(IntegerResult).Float64()
+		return BooleanResult(float64(left.(FloatResult)) < rightFloat), nil
+	} else if left.Kind() == ResultString && right.Kind() == ResultString {
+		return BooleanResult(left.(StringResult) < right.(StringResult)), nil
+	}
+
+	return BooleanResult(false), ErrCannotCompare
+}
+
+func doBinOpGt(left, right Result) (BooleanResult, error) {
+	if left.Kind() == ResultInt && right.Kind() == ResultInt {
+		cmp := left.(IntegerResult).Cmp(right.(IntegerResult).Int)
+		return BooleanResult(cmp == 1), nil
+	} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
+		return BooleanResult(left.(FloatResult) > right.(FloatResult)), nil
+	} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
+		leftFloat, _ := left.(IntegerResult).Float64()
+		return BooleanResult(leftFloat > float64(right.(FloatResult))), nil
+	} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
+		rightFloat, _ := right.(IntegerResult).Float64()
+		return BooleanResult(float64(left.(FloatResult)) > rightFloat), nil
+	} else if left.Kind() == ResultString && right.Kind() == ResultString {
+		return BooleanResult(left.(StringResult) > right.(StringResult)), nil
+	}
+
+	return BooleanResult(false), ErrCannotCompare
+}
 
 // EvaluateBinOp evaluates a binary operation node using namespace.
 func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
@@ -239,6 +321,103 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
 		}
+	case TokenEquals:
+		return doBinOpEquals(left, right), nil
+	case TokenNotEq:
+		return !doBinOpEquals(left, right), nil
+	case TokenLt:
+		result, err := doBinOpLt(left, right)
+		if err != nil && errors.Is(err, ErrCannotCompare) {
+			return nil, LangError{
+				ErrorType,
+				node.Position(),
+				fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+					node.Op.Value, left.Kind(), right.Kind()),
+			}
+		}
+		return result, nil
+	case TokenLtEq:
+		result, err := doBinOpLt(left, right)
+		if err != nil && errors.Is(err, ErrCannotCompare) {
+			return nil, LangError{
+				ErrorType,
+				node.Position(),
+				fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+					node.Op.Value, left.Kind(), right.Kind()),
+			}
+		}
+
+		return result || doBinOpEquals(left, right), nil
+	case TokenGt:
+		result, err := doBinOpGt(left, right)
+		if err != nil && errors.Is(err, ErrCannotCompare) {
+			return nil, LangError{
+				ErrorType,
+				node.Position(),
+				fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+					node.Op.Value, left.Kind(), right.Kind()),
+			}
+		}
+		return result, nil
+	case TokenGtEq:
+		result, err := doBinOpGt(left, right)
+		if err != nil && errors.Is(err, ErrCannotCompare) {
+			return nil, LangError{
+				ErrorType,
+				node.Position(),
+				fmt.Sprintf("binary operation %s is not defined on types %s and %s",
+					node.Op.Value, left.Kind(), right.Kind()),
+			}
+		}
+		return result || doBinOpEquals(left, right), nil
+	case TokenLogicalOr:
+		leftBool, err := ResultAsBoolean(left)
+		if err != nil && errors.Is(err, ErrCannotBoolean) {
+			return nil, LangError{
+				ErrorRuntime,
+				node.Position(),
+				fmt.Sprintf("left operand %s cannot be converted to be a boolean", left.Kind()),
+			}
+		}
+
+		if leftBool {
+			return BooleanResult(true), nil
+		}
+
+		rightBool, err := ResultAsBoolean(right)
+		if err != nil && errors.Is(err, ErrCannotBoolean) {
+			return nil, LangError{
+				ErrorRuntime,
+				node.Position(),
+				fmt.Sprintf("right operand %s cannot be converted to be a boolean", right.Kind()),
+			}
+		}
+
+		return leftBool || rightBool, nil
+	case TokenLogicalAnd:
+		leftBool, err := ResultAsBoolean(left)
+		if err != nil && errors.Is(err, ErrCannotBoolean) {
+			return nil, LangError{
+				ErrorRuntime,
+				node.Position(),
+				fmt.Sprintf("left operand %s cannot be converted to be a boolean", left.Kind()),
+			}
+		}
+
+		if !leftBool {
+			return BooleanResult(false), nil
+		}
+
+		rightBool, err := ResultAsBoolean(right)
+		if err != nil && errors.Is(err, ErrCannotBoolean) {
+			return nil, LangError{
+				ErrorRuntime,
+				node.Position(),
+				fmt.Sprintf("right operand %s cannot be converted to be a boolean", right.Kind()),
+			}
+		}
+
+		return leftBool && rightBool, nil
 	default:
 		return nil, LangError{
 			ErrorRuntime,
@@ -302,6 +481,22 @@ func EvaluateUnaryOp(node UnaryOpNode, namespace Namespace) (Result, error) {
 				fmt.Sprintf("%s does not support unary operation %s", result.Kind(), node.Op.Value),
 			}
 		}
+	case TokenNot:
+		result, err := Evaluate(node.Node, namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		asBool, err := ResultAsBoolean(result)
+		if err != nil && errors.Is(err, ErrCannotBoolean) {
+			return nil, LangError{
+				ErrorRuntime,
+				node.Position(),
+				fmt.Sprintf("%s cannot be converted to be a boolean", result.Kind()),
+			}
+		}
+
+		return !asBool, nil
 	default:
 		return nil, LangError{
 			ErrorRuntime,
@@ -568,6 +763,27 @@ func Evaluate(tree Node, namespace Namespace) (Result, error) {
 			tree.Position(),
 			fmt.Sprintf("evaluation undefined for type %s", tree.Type()),
 		}
+	}
+}
+
+// ResultAsBoolean reports the result as a boolean.
+func ResultAsBoolean(result Result) (BooleanResult, error) {
+	switch result.Kind() {
+	case ResultInt:
+		isZero := result.(IntegerResult).Cmp(new(big.Int))
+		return BooleanResult(isZero != 0), nil
+	case ResultFloat:
+		return BooleanResult(result.(FloatResult) != 0.0), nil
+	case ResultBoolean:
+		return result.(BooleanResult), nil
+	case ResultMap:
+		return BooleanResult(len(result.(MapResult)) > 0), nil
+	case ResultList:
+		return BooleanResult(len(result.(ListResult)) > 0), nil
+	case ResultString:
+		return BooleanResult(len(result.(StringResult)) > 0), nil
+	default:
+		return BooleanResult(false), ErrCannotBoolean
 	}
 }
 
