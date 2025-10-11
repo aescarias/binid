@@ -37,6 +37,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
@@ -55,6 +56,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
@@ -73,6 +75,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
@@ -100,6 +103,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
@@ -110,33 +114,34 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 			rightFloat, _ := right.(IntegerResult).Float64()
 
 			if rightFloat == 0 {
-				return nil, LangError{node.Position(), "division by zero"}
+				return nil, LangError{ErrorDomain, node.Position(), "division by zero"}
 			}
 
 			return FloatResult(leftFloat / rightFloat), nil
 		} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
 			if right.(FloatResult) == 0 {
-				return nil, LangError{node.Position(), "division by zero"}
+				return nil, LangError{ErrorDomain, node.Position(), "division by zero"}
 			}
 
 			return left.(FloatResult) / right.(FloatResult), nil
 		} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
 			rightFloat, _ := right.(IntegerResult).Float64()
 			if rightFloat == 0.0 {
-				return nil, LangError{node.Position(), "division by zero"}
+				return nil, LangError{ErrorDomain, node.Position(), "division by zero"}
 			}
 
 			return left.(FloatResult) / FloatResult(rightFloat), nil
 		} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
 			leftFloat, _ := left.(IntegerResult).Float64()
 			if right.(FloatResult) == 0.0 {
-				return nil, LangError{node.Position(), "division by zero"}
+				return nil, LangError{ErrorDomain, node.Position(), "division by zero"}
 			}
 
 			return FloatResult(leftFloat) / right.(FloatResult), nil
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
@@ -144,13 +149,13 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 	case TokenRemainder:
 		if left.Kind() == ResultInt && right.Kind() == ResultInt {
 			if right.(IntegerResult).Int == big.NewInt(0) {
-				return nil, LangError{node.Position(), "integer remainder by zero"}
+				return nil, LangError{ErrorDomain, node.Position(), "integer remainder by zero"}
 			}
 
 			return IntegerResult{new(big.Int).Rem(left.(IntegerResult).Int, right.(IntegerResult).Int)}, nil
 		} else if left.Kind() == ResultFloat && right.Kind() == ResultFloat {
 			if right.(FloatResult) == 0 {
-				return nil, LangError{node.Position(), "float remainder by zero"}
+				return nil, LangError{ErrorDomain, node.Position(), "float remainder by zero"}
 			}
 
 			rem := math.Remainder(float64(left.(FloatResult)), float64(right.(FloatResult)))
@@ -158,7 +163,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		} else if left.Kind() == ResultFloat && right.Kind() == ResultInt {
 			rightFloat, _ := right.(IntegerResult).Float64()
 			if rightFloat == 0.0 {
-				return nil, LangError{node.Position(), "float modulo by zero"}
+				return nil, LangError{ErrorDomain, node.Position(), "float remainder by zero"}
 			}
 
 			rem := math.Remainder(float64(left.(FloatResult)), rightFloat)
@@ -166,7 +171,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
 			leftFloat, _ := left.(IntegerResult).Float64()
 			if right.(FloatResult) == 0.0 {
-				return nil, LangError{node.Position(), "float modulo by zero"}
+				return nil, LangError{ErrorDomain, node.Position(), "float remainder by zero"}
 			}
 
 			rem := math.Remainder(leftFloat, float64(right.(FloatResult)))
@@ -174,6 +179,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
@@ -184,6 +190,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
@@ -194,6 +201,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
@@ -204,6 +212,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
@@ -214,6 +223,7 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
@@ -224,12 +234,14 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("binary operation %s is not defined on types %s and %s",
 				node.Op.Value, left.Kind(), right.Kind()),
 		}
 	default:
 		return nil, LangError{
+			ErrorRuntime,
 			node.Position(),
 			fmt.Sprintf("behavior undefined for binary operation %s", node.Op.Value),
 		}
@@ -251,6 +263,7 @@ func EvaluateUnaryOp(node UnaryOpNode, namespace Namespace) (Result, error) {
 			return result.(FloatResult), nil
 		default:
 			return nil, LangError{
+				ErrorType,
 				node.Position(),
 				fmt.Sprintf("%s does not support unary operation %s", result.Kind(), node.Op.Value),
 			}
@@ -268,6 +281,7 @@ func EvaluateUnaryOp(node UnaryOpNode, namespace Namespace) (Result, error) {
 			return -result.(FloatResult), nil
 		default:
 			return nil, LangError{
+				ErrorType,
 				node.Position(),
 				fmt.Sprintf("%s does not support unary operation %s", result.Kind(), node.Op.Value),
 			}
@@ -283,12 +297,14 @@ func EvaluateUnaryOp(node UnaryOpNode, namespace Namespace) (Result, error) {
 			return IntegerResult{new(big.Int).Not(result.(IntegerResult).Int)}, nil
 		default:
 			return nil, LangError{
+				ErrorType,
 				node.Position(),
 				fmt.Sprintf("%s does not support unary operation %s", result.Kind(), node.Op.Value),
 			}
 		}
 	default:
 		return nil, LangError{
+			ErrorRuntime,
 			node.Position(),
 			fmt.Sprintf("undefined binary operation %s", node.Op.Value),
 		}
@@ -300,7 +316,7 @@ func EvaluateLiteral(node LiteralNode, ns Namespace) (Result, error) {
 	case TokenInteger:
 		number := new(big.Int)
 		if _, ok := number.SetString(node.Token.Value, 0); !ok {
-			return nil, LangError{node.Position(), "invalid integer literal"}
+			return nil, LangError{ErrorSyntax, node.Position(), "invalid integer literal"}
 		}
 
 		return IntegerResult{number}, nil
@@ -308,6 +324,7 @@ func EvaluateLiteral(node LiteralNode, ns Namespace) (Result, error) {
 		number, err := strconv.ParseFloat(node.Token.Value, 64)
 		if err != nil {
 			return nil, LangError{
+				ErrorSyntax,
 				node.Position(),
 				fmt.Sprintf("invalid float literal: %s", err),
 			}
@@ -325,6 +342,7 @@ func EvaluateLiteral(node LiteralNode, ns Namespace) (Result, error) {
 			value, ok := ns[ident]
 			if !ok {
 				return nil, LangError{
+					ErrorAccess,
 					node.Position(),
 					fmt.Sprintf("%q is not defined", node.Token.Value),
 				}
@@ -341,6 +359,7 @@ func EvaluateLiteral(node LiteralNode, ns Namespace) (Result, error) {
 			return BooleanResult(false), nil
 		default:
 			return nil, LangError{
+				ErrorSyntax,
 				node.Position(),
 				fmt.Sprintf("unknown keyword %q", val),
 			}
@@ -349,6 +368,7 @@ func EvaluateLiteral(node LiteralNode, ns Namespace) (Result, error) {
 		return StringResult(node.Token.Value), nil
 	default:
 		return nil, LangError{
+			ErrorRuntime,
 			node.Position(),
 			fmt.Sprintf("evaluation undefined for literal type %s", node.Token.Kind),
 		}
@@ -443,6 +463,7 @@ func EvaluateSubscript(node SubscriptNode, namespace Namespace) (Result, error) 
 		}
 
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("type %s does not allow type parameters", typeRes.Name),
 		}
@@ -451,6 +472,7 @@ func EvaluateSubscript(node SubscriptNode, namespace Namespace) (Result, error) 
 
 		if item.Kind() != ResultInt {
 			return nil, LangError{
+				ErrorType,
 				node.Position(),
 				fmt.Sprintf("list indices must be %s, not %s", ResultInt, item.Kind()),
 			}
@@ -458,13 +480,14 @@ func EvaluateSubscript(node SubscriptNode, namespace Namespace) (Result, error) 
 
 		intVal := item.(IntegerResult).Int64()
 		if intVal >= int64(len(valueRes)) {
-			return nil, LangError{node.Position(), "index out of bounds"}
+			return nil, LangError{ErrorAccess, node.Position(), "index out of bounds"}
 		}
 
 		value = valueRes[intVal]
 		ok = true
 	default:
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("object of type %s does not support subscript access", expr.Kind()),
 		}
@@ -472,6 +495,7 @@ func EvaluateSubscript(node SubscriptNode, namespace Namespace) (Result, error) 
 
 	if !ok {
 		return nil, LangError{
+			ErrorAccess,
 			node.Position(),
 			fmt.Sprintf("object of type %s does not have a member or key named %v", expr.Kind(), item),
 		}
@@ -503,6 +527,7 @@ func EvaluateAttr(node AttrNode, namespace Namespace) (Result, error) {
 		value, ok = expr.(MapResult)[attr]
 	default:
 		return nil, LangError{
+			ErrorType,
 			node.Position(),
 			fmt.Sprintf("object of type %s does not support attribute access", expr.Kind()),
 		}
@@ -510,6 +535,7 @@ func EvaluateAttr(node AttrNode, namespace Namespace) (Result, error) {
 
 	if !ok {
 		return nil, LangError{
+			ErrorAccess,
 			node.Position(),
 			fmt.Sprintf("object of type %s does not have a member named %v", expr.Kind(), attr),
 		}
@@ -538,6 +564,7 @@ func Evaluate(tree Node, namespace Namespace) (Result, error) {
 		return EvaluateSubscript(*tree.(*SubscriptNode), namespace)
 	default:
 		return nil, LangError{
+			ErrorRuntime,
 			tree.Position(),
 			fmt.Sprintf("evaluation undefined for type %s", tree.Type()),
 		}
@@ -626,6 +653,7 @@ func MustEvaluateLazily(node Node) (bool, error) {
 		return false, nil
 	default:
 		return false, LangError{
+			ErrorRuntime,
 			node.Position(),
 			fmt.Sprintf("evaluation undefined for type %s", node.Type()),
 		}

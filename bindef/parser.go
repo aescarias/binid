@@ -10,13 +10,24 @@ type Node interface {
 	Position() Position
 }
 
+type ErrorKind string
+
+const (
+	ErrorDomain  ErrorKind = "domain"
+	ErrorAccess  ErrorKind = "access"
+	ErrorRuntime ErrorKind = "runtime"
+	ErrorSyntax  ErrorKind = "syntax"
+	ErrorType    ErrorKind = "type"
+)
+
 type LangError struct {
+	Kind     ErrorKind
 	Position Position
 	Message  string
 }
 
 func (le LangError) Error() string {
-	return le.Message
+	return fmt.Sprintf("error(%s): %s", le.Kind, le.Message)
 }
 
 type UnaryOpNode struct {
@@ -131,7 +142,7 @@ func (ps *Parser) tryPostfix(left Node) (Node, error) {
 				return nil, err
 			}
 			if ps.IsDone() || ps.Cursor().Kind != TokenRBracket {
-				return nil, LangError{item.Position(), "expected closing bracket for subscript access"}
+				return nil, LangError{ErrorSyntax, item.Position(), "expected closing bracket for subscript access"}
 			}
 			ps.Advance(1)
 			left = &SubscriptNode{Expr: left, Item: item}
@@ -148,7 +159,7 @@ func (ps *Parser) tryPostfix(left Node) (Node, error) {
 				if ps.Cursor().Kind == TokenComma {
 					ps.Advance(1)
 				} else if ps.IsDone() || ps.Cursor().Kind != TokenRParen {
-					return nil, LangError{arg.Position(), "expected closing paren in argument list"}
+					return nil, LangError{ErrorSyntax, arg.Position(), "expected closing paren in argument list"}
 				}
 			}
 			end := ps.Cursor().Position.End
@@ -157,7 +168,7 @@ func (ps *Parser) tryPostfix(left Node) (Node, error) {
 		case TokenDot:
 			ps.Advance(1)
 			if ps.IsDone() || ps.Cursor().Kind != TokenIdentifier {
-				return nil, LangError{left.Position(), "expected identifier after dot"}
+				return nil, LangError{ErrorSyntax, left.Position(), "expected identifier after dot"}
 			}
 			attr := &LiteralNode{Token: ps.Cursor()}
 			ps.Advance(1)
@@ -194,7 +205,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 
 		if ps.IsDone() || ps.Cursor().Kind != TokenRParen {
 			pos := Position{Start: expr.Position().End, End: expr.Position().End + 1}
-			return nil, LangError{pos, "expected closing parenthesis"}
+			return nil, LangError{ErrorSyntax, pos, "expected closing parenthesis"}
 		}
 		ps.Advance(1)
 
@@ -212,7 +223,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 
 			if ps.IsDone() || ps.Cursor().Kind != TokenColon {
 				pos := Position{Start: key.Position().End, End: key.Position().End + 1}
-				return nil, LangError{pos, "expected colon after key in mapping"}
+				return nil, LangError{ErrorSyntax, pos, "expected colon after key in mapping"}
 			}
 			ps.Advance(1)
 
@@ -225,7 +236,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 				ps.Advance(1)
 			} else if ps.IsDone() || ps.Cursor().Kind != TokenRBrace {
 				pos := Position{Start: value.Position().End, End: value.Position().End + 1}
-				return nil, LangError{pos, "expected closing brace for mapping"}
+				return nil, LangError{ErrorSyntax, pos, "expected closing brace for mapping"}
 			}
 
 			items[key] = value
@@ -250,7 +261,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 				ps.Advance(1)
 			} else if ps.IsDone() || ps.Cursor().Kind != TokenRBracket {
 				pos := Position{Start: item.Position().End, End: item.Position().End + 1}
-				return nil, LangError{pos, "expected closing bracket or comma for list"}
+				return nil, LangError{ErrorSyntax, pos, "expected end of list"}
 			}
 
 			items = append(items, item)
@@ -264,6 +275,7 @@ func (ps *Parser) ParseLiteral() (Node, error) {
 
 	if left == nil {
 		return nil, LangError{
+			ErrorRuntime,
 			ps.Cursor().Position,
 			fmt.Sprintf("unknown literal type %s", ps.Cursor().Kind),
 		}

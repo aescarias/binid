@@ -303,6 +303,7 @@ func (lx *Lexer) LexString(delimiter byte) (Token, error) {
 				hexVal, err := strconv.ParseInt(hexSeq, 16, 16)
 				if err != nil {
 					return Token{}, LangError{
+						ErrorSyntax,
 						Position{escapeStart, lx.Position + byteSize + 1},
 						fmt.Sprintf("invalid hex sequence %s", hexSeq),
 					}
@@ -318,6 +319,7 @@ func (lx *Lexer) LexString(delimiter byte) (Token, error) {
 				octVal, err := strconv.ParseInt(octSeq, 8, 8)
 				if err != nil {
 					return Token{}, LangError{
+						ErrorSyntax,
 						Position{escapeStart, lx.Position + octSize},
 						fmt.Sprintf("invalid octal sequence %s", octSeq),
 					}
@@ -329,6 +331,7 @@ func (lx *Lexer) LexString(delimiter byte) (Token, error) {
 			}
 
 			return Token{}, LangError{
+				ErrorSyntax,
 				Position{escapeStart, lx.Position},
 				fmt.Sprintf("unknown escape sequence %q", lx.Cursor()),
 			}
@@ -346,6 +349,7 @@ func (lx *Lexer) LexString(delimiter byte) (Token, error) {
 
 	if !closed {
 		return Token{}, LangError{
+			ErrorSyntax,
 			Position{start, lx.Position},
 			"string was never closed",
 		}

@@ -94,7 +94,7 @@ func ReportError(filepath string, source []byte, err error) {
 			if idx == line {
 				length := lerr.Position.End - lerr.Position.Start
 				fmt.Printf("in %s:%d:%d-%d\n", filepath, line+1, column+1, column+1+length)
-				fmt.Printf("error: %s\n", lerr.Message)
+				fmt.Println(lerr)
 
 				trimmed := strings.TrimLeftFunc(string(lineStr), unicode.IsSpace)
 				diff := len(string(lineStr)) - len(trimmed)
