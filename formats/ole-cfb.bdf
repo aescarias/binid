@@ -4,8 +4,29 @@
     name: "Compound File Binary Format",
     mime: ["application/x-ole-storage"],
     exts: [],
+    doc: 
+      "Also known as the OLE (Object Linking and Embedding) file format, " +
+      "it is a container format developed by Microsoft with features resembling " +
+      "those of a file system such as FAT. This format is seen in older " +
+      "Microsoft Office/Works documents, alongside other Windows formats such as MSI." 
   },
   binary: [
-    { type: magic, match: "\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" } 
+    { 
+      type: magic, 
+      match: [
+        "\x0e\x11\xfc\x0d\xd0\xcf\x11\x0e",
+        "\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" // used by beta versions of the format
+      ] 
+    },
+    { type: byte[16], id: clsid, name: "CLSID" },
+
+    // TODO: The format is usually little endian but it may be big endian if 
+    // byteOrder is FE FF.
+    { type: uint16,  endian: "little", id: minorVersion, name: "Minor version" },
+    { type: uint16,  endian: "little", id: majorVersion, name: "Major version"},
+    { type: byte[2], id: byteOrder,    name: "Byte order" },
+    { type: uint16,  endian: "little", id: sectorSize,   name: "Sector size (bytes)"},
+    { type: uint16,  endian: "little", id: shortSectorSize, name: "Short sector size (bytes)"},
+    { type: byte[3], id: _reserved }
   ]
 }

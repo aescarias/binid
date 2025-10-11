@@ -1,3 +1,8 @@
+// BinDef for a common Unix archive (ar) file
+
+// This format is not standardized so information is taken from
+// https://en.wikipedia.org/wiki/Ar_(Unix)#File_format
+
 {
   meta: {
     bdf: "0.1",
@@ -6,6 +11,13 @@
     exts: [".ar", ".a", ".lib"]
   },
   binary: [
-    { type: magic, match: "!<arch>\n" }
+    { type: magic, match: "!<arch>\n" },
+    { type: byte[16], id: fileId,       name: "File identifier", strip: true},
+    { type: byte[12], id: modTimestamp, name: "File modification timestamp (seconds)", strip: true},
+    { type: byte[6],  id: ownerId,      name: "Owner ID", strip: true},
+    { type: byte[6],  id: groupId,      name: "Group ID", strip: true},
+    { type: byte[8],  id: fileMode,     name: "File mode (octal)", strip: true },
+    { type: byte[10], id: fileSize,     name: "File size (bytes)", strip: true },
+    { type: byte[2] }
   ]
 }

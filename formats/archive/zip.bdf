@@ -9,10 +9,10 @@
   },
   binary: [
     { type: magic, match: "PK\x03\x04" },
-    { id: minVersion,        type: uint16, endian: "little" },
-    { id: gpBitFlag,         type: uint16, endian: "little" },
-    { id: compressionMethod, type: uint16, endian: "little" },
-    { id: lastModFileTime,   type: uint16, endian: "little" },
-    { id: lastModFileDate,   type: uint16, endian: "little" },
+    { id: minVersion,        type: uint16, endian: "little", name: "Minimum version to extract" },
+    { id: gpBitFlag,         type: uint16, endian: "little", name: "General-purpose bit flag" },
+    { id: compressionMethod, type: uint16, endian: "little", name: "Compression method" },
+    { id: lastModFileTime,   type: uint16, endian: "little", name: "Last file modification time" },
+    { id: lastModFileDate,   type: uint16, endian: "little", name: "Last file modification date" },
   ]
 }

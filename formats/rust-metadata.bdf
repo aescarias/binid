@@ -1,4 +1,9 @@
 // BinDef for the header of a rustc binary metadata file
+
+// This format is undocumented and so the structure has been obtained from
+// source code files.
+// https://doc.rust-lang.org/nightly/nightly-rustc/src/rustc_metadata/rmeta/mod.rs.html
+
 {
   meta: {
     bdf: "0.1",
