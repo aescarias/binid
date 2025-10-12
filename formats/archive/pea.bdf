@@ -1,0 +1,18 @@
+// BinDef for PeaZip's PEA archive format
+// Spec: https://peazip.github.io/pea_help.pdf
+{
+  meta: {
+    bdf: "0.1",
+    name: "PEA (Pack-Encrypt-Authenticate) archive",
+    mime: [],
+    exts: [".pea"],
+    doc: "PEA is an archive format produced by the PeaZip archive utility",
+  },
+  binary: [
+    { type: magic, match: "\xea" },
+    { type: uint8, id: version,         name: "Version" },
+    { type: uint8, id: revision,        name: "Revision" },
+    { type: uint8, id: volumeControl,   name: "Volume control scheme" },
+    { type: uint8, id: errorCorrection, name: "Error correction scheme" },
+  ]
+}

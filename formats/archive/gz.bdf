@@ -1,0 +1,11 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "GZip compressed data",
+    mime: ["application/gzip"],
+    exts: [".gz"]
+  },
+  binary: [
+    { type: magic, match: "\x1f\x8b" }
+  ]
+}

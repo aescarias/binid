@@ -1,0 +1,13 @@
+{
+  meta: {
+    bdf: "0.1",
+    name: "XZ compressed file",
+    mime: ["application/x-xz"],
+    exts: [".xz"]
+  },
+  binary: [
+    { type: magic, match: "\xFD\x37\x7A\x58\x5A\x00" },
+    { type: uint16, id: flags, endian: "little" },
+    { type: uint32, id: crc32, endian: "little" },
+  ]
+}

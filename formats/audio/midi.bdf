@@ -1,0 +1,21 @@
+// BinDef for a standard MIDI file
+// Documentation can be found at https://midi.org/standard-midi-files
+
+{
+  meta: {
+    bdf: "0.1",
+    name: "MIDI audio file",
+    exts: [".mid", ".midi"],
+    mime: ["audio/midi"],
+  },
+  binary: [
+    // .midi uses a typical type-length-value structure (chunk) to encode its contents
+    // the first one is the header chunk which uses the type "MThd".
+    { type: magic, match: "MThd" },
+    { type: uint32, id: length,   endian: "big", valid: length == 6 },
+    { type: uint16, id: format,   endian: "big", valid: 0 <= format && format <= 2 },
+    { type: uint16, id: nTracks,  endian: "big", valid: format != 0 || nTracks == 1 },
+    { type: uint16, id: division, endian: "big" }
+  ]
+  
+}

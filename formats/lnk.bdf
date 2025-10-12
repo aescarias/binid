@@ -1,0 +1,27 @@
+// BinDef for the Windows Shell Link or Shortcut format (.LNK)
+// Documented at https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-shllink/16cb4ca1-9339-4d0c-a68d-bf1d6cc0f943
+
+{
+  meta: {
+    bdf: "0.1",
+    name: "Windows Shell Link (Shortcut)",
+    exts: [".lnk", ".url"],
+    mime: ["application/x-ms-shortcut"]
+  },
+  binary: [
+    { type: magic, match: "\x4c\x00\x00\x00" },
+    { type: byte[16], id: clsid,        name: "CLSID", 
+      valid: clsid == "\x01\x14\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00\x46" },
+    { type: uint32,   id: flags,        endian: "little", name: "Flags" },
+    { type: uint32,   id: attributes,   endian: "little", name: "Attributes" },
+    { type: uint64,   id: creationTime, endian: "little", name: "Creation time" },
+    { type: uint64,   id: writeTime,    endian: "little", name: "Access time" },
+    { type: uint64,   id: accessTime,   endian: "little", name: "Write time" },
+    { type: uint32,   id: fileSize,     endian: "little", name: "File size (bytes)" },
+    { type: int32,    id: iconIndex,    endian: "little", name: "Icon index" },
+    { type: uint32,   id: showCommand,  endian: "little", name: "Show command" },
+    { type: uint16,   id: hotkeyFlags,  endian: "little", name: "Hotkey flags" },
+    { type: byte[10], id: _res1, 
+      valid: _res1 == "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" } // reserved bytes
+  ]
+}
