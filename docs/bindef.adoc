@@ -1,6 +1,6 @@
 = The BinDef Language Reference
 Ángel Carias <lotta.dev@outlook.com>
-v0.1, 2025-10-10
+v0.1, 2025-10-11
 :toc: auto
 :sectnums: |,all|
 
@@ -273,9 +273,9 @@ The following binary operations are defined:
 - Bitwise AND (`&`)
 - Bitwise XOR (`^`)
 
-=== Addition (`+`)
+=== Addition
 
-If `a` and `b` are numeric types (integers and floats), `a + b` returns the sum of a plus b. If either operand is a float, the other operand is converted to a float and the resulting value will also be a float.
+If `a` and `b` are numeric types (meaning either integers or floats), `a + b` returns the sum of a plus b. If either operand is a float, the other operand is converted to a float and the resulting value will also be a float.
 
 If `a` and `b` are strings, `a + b` returns the concatenation of the strings `a` and `b`.
 
@@ -340,6 +340,8 @@ The sign bit of the result will be the same as the sign bit of the dividend.
 -3.2 %  2  // -1.2
  3.2 % -2  //  1.2
 ----
+
+As with division, remainder by zero is not defined.
 
 === Exponentiation
 
@@ -517,26 +519,107 @@ If a BinDef processor finds a type that it doesn't recognize, it shall stop pars
 
 == Format types
 
-All format types share five keys: `type`, `id`, `name`, `doc`, and `at`. 
+All format types share the following keys:
+
+[cols="1,1,2"]
+|====
+|Key |Data Type |Value
+
+|type 
+|type name    
+|(required) The format type being described.
+
+|id
+|identifier
+|(optional) An identifier for this field within the current binary structure.
+
+|name
+|string
+|(optional) A human-readable title describing the contents of this field.
+
+|doc
+|string
+|(optional) Information documenting this field such as its purpose or use.
+
+|at
+|integer or list of integers
+|(optional) A seek position from which the field will be read.
+
+|valid
+|lazy expression
+|(optional) A function that validates the contents of the field. If the validation fails, parsing should be stopped and an error should be raised.
+
+|if
+|lazy expression
+|(optional) A condition for parsing the field. If the condition is met, the field will be parsed; otherwise, it will be skipped.
+|====
 
 All format types must have a `type` key with an identifier for the format type being used. This also determines whether additional keys may be specified.
 
-The `id` key whose value is an identifier may be used to identify the value being described. An identifier starting with `_` is considered private and will not appear in the extracted output.
+The `id` key may contain a name used to identify the value being described. An identifier starting with `_` is considered private and will not appear in the extracted output. If the contents of the field are not relevant (such as with padding or reserved values), the `id` key may be skipped. 
 
 The `name` and `doc` keys provide optional documentation for a field. The `name` key is a string intended as a human-readable name of the field. The `doc` key is designed to provide additional information on the purpose of the field or possible values.
 
-`at` is an optional key that may contain either an integer or a list of at two items.
+=== Seeking
 
-* The first item is an integer specifying a byte offset. 
-* The second item is either of the following string values:
-+ 
-  ** `"start"` means the byte offset is relative to the start of the file (the start being byte offset 0).
-  ** `"current"` means the byte offset is relative to the current position within the file.
-  ** `"end"` means the byte offset is relative to the end of the file.
+Not every format can be parsed sequentially. Many formats include a header with offsets to different parts of the format structure. To address this, BinDef provides the `at` key which allows a BinDef runtime to _seek_ to a particular byte offset and start parsing fields from that position.
 
-You may notice that the contents of the `at` key resemble the arguments to a `seek()` function. In essence, `at` performs a *seek operation* before reading the type value.
+The `at` key may be either an integer or a list of two items. 
 
-If `at` is not specified, the current position will be relative to the position of the previously read token. If no token was previously read, the position assumed is 0. `{at: 0}` implies `{at: [0, "current"]}`.
+* If a single integer, `at` contains the byte offset relative to the start of the file to which the runtime should skip to. 
+* If a list, the elements are as follows:
++  
+  ** The first item is an integer specifying a byte offset to skip to. 
+  ** The second item is either of the following string values: 
+    *** `"start"` means the byte offset is relative to the start of the file (the start being byte offset 0).
+    *** `"current"` means the byte offset is relative to the current position within the file.
+    *** `"end"` means the byte offset is relative to the end of the file. In this case, the byte offset is usually negative.
+
+If the `at` key is not specified, the position from which the field will be read from will be relative to the position of the previously read field. If no field was previously read, the start position assumed is 0. 
+
+`{at: 0}` implies `{at: [0, "current"]}`.
+
+=== Validations
+
+In many cases, the values of a field are known and expected to be in a set range. To ensure that this is the case when processing the field, BinDef provides the `valid` key which contains a lazily-evaluated expression that returns a boolean determining whether the value contained in the field is correct.
+
+If the expression evaluates to false, then a BinDef runtime should stop parsing the document and should raise an error.
+
+A common use case for `valid` is checking if the binary format being parsed conforms to a particular version.
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: uint8, id: version, valid: version == 1 }
+  ]
+}
+----
+
+In this case, the `version` field must be 1; otherwise, parsing is stopped.
+
+=== Conditional fields
+
+Conditional fields allow a BinDef runtime to only process a field if the specified condition is met.
+
+It is possible that a field may only appear if a certain condition is met. For example, our hypothetical file format has a "timestamp" field that is only present when the version is 1.
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: uint8,   id: version },
+    { type: int32,   id: timestamp, if: version == 1 },
+    { type: byte[4], id: code }
+  ]
+}
+----
+
+Here, `version` being 1 determines whether `timestamp` is parsed before `code` or whether `code` is the next field in the sequence. 
+
+It is worth noting that the `if` condition is checked before performing any seek operations, so if the condition is not met, the seek will not occur.
 
 === The `magic` type
 
@@ -585,7 +668,7 @@ For example, the Extended Module (xm) format used by some https://en.wikipedia.o
 {
   meta: {},
   binary: [
-    { type: magic, match: ["Extended Module: "]},
+    { type: magic, match: "Extended Module: " },
     { type: byte[20], id: moduleName, name: "Module name" }
   ]
 }
@@ -614,7 +697,7 @@ Of course, the length of the byte sequence may also be fetched from another iden
 }
 ----
 
-The provided `size` must be a numeric type. If the numeric type is a float, the decimal part is converted to an integer.
+The provided `size` must be a numeric type. If the numeric type is a float, it is truncated and converted to an integer.
 
 == Versioning
 
@@ -622,7 +705,7 @@ BinDef versions follow the `X.Y` format where `X` is the major version and `Y` i
 
 The **major version** is incremented by 1 when a _breaking change_ occurs, that is, a change that may break compatibility with a BinDef processor supporting an older major version. For example, new syntax or removal of a field would constitute a major version increase.  
 
-The **minor version** is incremented by 1 when a _backwards compatible change_ occurs, that is, a change that does not affect compatibility with a BinDef processor supporting the same major version but an older minor version. Minor versions are usually small revisions and patches, deprecations, or new features that don't break syntax.
+The **minor version** is incremented by 1 when a _backwards compatible change_ occurs, that is, a change that does not affect compatibility with a BinDef processor supporting the same major version but an older minor version. Minor versions are usually small revisions and patches, deprecations, or new features that don't introduce new syntax.
 
 A special exception to this is when the major version is zero; in such case, the minor version should be treated as the major version. No compatibility guarantees are made between `0.X` releases.
 

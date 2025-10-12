@@ -11,10 +11,15 @@
   },
   binary: [
     { type: magic, match: "\x7fELF" },
-    { id: class,      type: uint8, name: "Class" },
-    { id: endian,     type: uint8, name: "Endianness" },
-    { id: version,    type: uint8, name: "Version" },
-    { id: abiType,    type: uint8, name: "Target ABI" },
-    { id: abiVersion, type: uint8, name: "Target ABI version" },
+    { id: class,      type: uint8,  name: "Class" },
+    { id: endian,     type: uint8,  name: "Endianness" },
+    { id: version,    type: uint8,  name: "Version", valid: version == 1 },
+    { id: abiType,    type: uint8,  name: "Target ABI" },
+    { id: abiVersion, type: uint8,  name: "Target ABI version" },
+    { type: byte[7] }, // reserved padding
+    { id: objectType, type: uint16, name: "Object file type", 
+      endian: "little", 
+      if: endian == 1 // TODO: little endian only for now
+    }
   ]
 }

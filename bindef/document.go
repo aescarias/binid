@@ -66,6 +66,8 @@ type FormatType struct {
 	Name   string     // Human-readable field name.
 	Doc    string     // Documentation.
 	At     SeekPos    // Seek position.
+	Valid  LazyResult // Validation function.
+	If     LazyResult // Only process value on condition.
 	Endian string     // For integer types only, the byte endianness (either "big" or "little").
 	Match  []MagicTag // For magic types only, the pattern(s) that must match.
 	Size   int64      // For byte types only, the size of the byte string.
@@ -274,12 +276,24 @@ func parseFormatType(format Result, ns Namespace) (FormatType, error) {
 		}
 	}
 
+	validRes, err := GetKeyByIdent[LazyResult](bin, "valid", false)
+	if err != nil {
+		return FormatType{}, err
+	}
+
+	ifRes, err := GetKeyByIdent[LazyResult](bin, "if", false)
+	if err != nil {
+		return FormatType{}, err
+	}
+
 	baseFormat := FormatType{
-		Type: typeRes.Name,
-		Id:   string(idRes),
-		Name: string(nameRes),
-		Doc:  string(docRes),
-		At:   atVal,
+		Type:  typeRes.Name,
+		Id:    string(idRes),
+		Name:  string(nameRes),
+		Doc:   string(docRes),
+		At:    atVal,
+		If:    ifRes,
+		Valid: validRes,
 	}
 
 	switch typeRes.Name {
@@ -481,6 +495,22 @@ func ApplyBDF(document Result, targetFile string) ([]MetaPair, error) {
 			return nil, fmt.Errorf("binary[%d]: %w", idx, err)
 		}
 
+		if formatType.If != nil {
+			willParseRes, err := formatType.If(ns)
+			if err != nil {
+				return nil, err
+			}
+
+			willParse, err := ResultIs[BooleanResult](willParseRes)
+			if err != nil {
+				return nil, err
+			}
+
+			if !willParse {
+				continue
+			}
+		}
+
 		var emptyPos SeekPos
 		if formatType.At != emptyPos {
 			if _, err := handle.Seek(formatType.At.Offset, formatType.At.Whence); err != nil {
@@ -531,6 +561,22 @@ func ApplyBDF(document Result, targetFile string) ([]MetaPair, error) {
 		var zero string
 		if formatType.Id != zero {
 			ns[IdentResult(formatType.Id)] = value
+		}
+
+		if formatType.Valid != nil {
+			isValidRes, err := formatType.Valid(ns)
+			if err != nil {
+				return nil, err
+			}
+
+			isValid, err := ResultIs[BooleanResult](isValidRes)
+			if err != nil {
+				return nil, err
+			}
+
+			if !isValid {
+				return nil, fmt.Errorf("binary[%d] contains an invalid value", idx)
+			}
 		}
 
 		if formatType.Name != zero {
