@@ -374,7 +374,6 @@ var singleTokenMap = map[byte]TokenKind{
 	'.': TokenDot,
 	'+': TokenPlus,
 	'-': TokenMinus,
-	'!': TokenNot,
 	'%': TokenRemainder,
 	'^': TokenBitwiseXor,
 	'~': TokenBitwiseNot,
