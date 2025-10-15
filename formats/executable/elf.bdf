@@ -1,6 +1,6 @@
 {
   meta: {
-    bdf: "0.1",
+    bdf: "0.2",
     name: "Executable and Linkable Format",
     mime: ["application/x-executable"],
     exts: [],
@@ -10,16 +10,83 @@
       "file format among Unix-likes."
   },
   binary: [
-    { type: magic, match: "\x7fELF" },
-    { id: class,      type: uint8,  name: "Class" },
-    { id: endian,     type: uint8,  name: "Endianness" },
-    { id: version,    type: uint8,  name: "Version", valid: version == 1 },
-    { id: abiType,    type: uint8,  name: "Target ABI" },
-    { id: abiVersion, type: uint8,  name: "Target ABI version" },
-    { type: byte[7] }, // reserved padding
-    { id: objectType, type: uint16, name: "Object file type", 
-      endian: "little", 
-      if: endian == 1 // TODO: little endian only for now
+    // temp field for determining endianness
+    { id: _elfEndian, type: uint8, at: 5 },
+    { id: header, 
+      type: struct,
+      name: "ELF Header",
+      endian: "little",
+      endian: _elfEndian == 1 ? "little" : "big",
+      at: 0,
+      fields: [
+        { type: magic, match: "\x7fELF" },
+        { id: class,      type: uint8,  name: "Class" },
+        { id: endian,     type: uint8,  name: "Endianness", valid: endian == _elfEndian },
+        { id: version,    type: uint8,  name: "Version", valid: version == 1 },
+        { id: abiType,    type: uint8,  name: "Target ABI" },
+        { id: abiVersion, type: uint8,  name: "Target ABI version" },
+        { type: byte[7] }, // reserved padding
+        { id: objectType,     type: uint16, name: "Object file type" },
+        { id: targetISA,      type: uint16, name: "Target ISA" },
+        { id: version,        type: uint32, name: "Version", valid: version == 1 },
+        { id: entryPointAddr,
+          type: class == 1 ? uint32 : uint64,
+          name: "Entry point address"
+        },
+        { id: progHdrTableStart,
+          type: class == 1 ? uint32 : uint64,
+          name: "Offset to program header table"
+        },
+        { id: sectHdrTableStart, 
+          type: class == 1 ? uint32 : uint64,
+          name: "Offset to section header table"
+        },
+        { id: flags,            type: uint32, name: "Architecture flags" },
+        { id: headerSize,       type: uint16, name: "Header size" },
+        { id: progHdrEntrySize, type: uint16, name: "Size of program header table entry" },
+        { id: nProgHdrEntries,  type: uint16, name: "Number of program header entries" },
+        { id: sectHdrEntrySize, type: uint16, name: "Size of section header table entry" },
+        { id: nSectHdrEntries,  type: uint16, name: "Number of section header entries" },
+        { id: idxSectNames,     type: uint16, name: "Index of section names in table" }
+      ]
+    },
+    { id: programHeader,
+      type: struct, // todo: struct[header.nProgHdrEntries]
+      at: header.progHdrTableStart,
+      if: header.nProgHdrEntries > 0,
+      name: "Program header entry 1",
+      endian: header.endian == 1 ? "little" : "big",
+      fields: [
+        { id: segmentType,   type: uint32, name: "Segment type" },
+        { if: header.class == 2, // 64-bit ELF field
+          id: segmentFlags,  type: uint32, name: "Segment flags" },
+        { id: segmentOffset, type: uint32, name: "Offset in file image" },
+        { id: vAddr,      
+          type: header.class == 1 ? uint32 : uint64,
+          name: "Virtual address"
+        },
+        { id: pAddr,
+          type: header.class == 1 ? uint32 : uint64,
+          name: "Physical address"
+        },
+        { id: fileSize,
+          type: header.class == 1 ? uint32 : uint64,
+          name: "Size of segment in file image"
+        },
+        { id: memSize,
+          type: header.class == 1 ? uint32 : uint64,
+          name: "Size of segment in memory"
+        },
+        { if: header.class == 1, // 32-bit ELF field
+          id: segmentFlags,
+          type: uint32,
+          name: "Segment flags"
+        },
+        { id: alignment,
+          type: header.class == 1 ? uint32 : uint64,
+          name: "Address align"
+        } 
+      ]
     }
   ]
 }

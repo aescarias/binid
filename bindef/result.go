@@ -82,6 +82,7 @@ const (
 	TypeMagic  TypeName = "magic"
 	TypeBool   TypeName = "bool"
 	TypeByte   TypeName = "byte"
+	TypeStruct TypeName = "struct"
 	TypeUint8  TypeName = "uint8"
 	TypeUint16 TypeName = "uint16"
 	TypeUint32 TypeName = "uint32"
@@ -95,9 +96,42 @@ const (
 func (tr TypeResult) Kind() ResultKind { return ResultType }
 
 var AvailableTypeNames = []TypeName{
-	TypeMagic, TypeBool, TypeByte,
+	TypeMagic, TypeBool, TypeByte, TypeStruct,
 	TypeUint8, TypeUint16, TypeUint32, TypeUint64,
 	TypeInt8, TypeInt16, TypeInt32, TypeInt64,
+}
+
+// GetEvalKeyByIdent pipes its arguments to [GetKeyByIdent] and returns its result but
+// handling cases where mapping is expected to contain a key that is either a result
+// of type T or a lazy result that evaluates to one of type T. This evaluation is
+// done using the namespace ns.
+func GetEvalKeyByIdent[T Result](mapping map[Result]Result, key string, required bool, ns Namespace) (T, error) {
+	var zero T
+
+	maybeEvalRes, err := GetKeyByIdent[Result](mapping, key, required)
+	if err != nil {
+		return zero, err
+	}
+
+	if maybeEvalRes == nil {
+		return zero, err
+	}
+
+	var res Result
+	if maybeEvalRes.Kind() == ResultLazy {
+		if res, err = maybeEvalRes.(LazyResult)(ns); err != nil {
+			return zero, err
+		}
+	} else {
+		res = maybeEvalRes
+	}
+
+	asserted, ok := res.(T)
+	if !ok {
+		panic(fmt.Sprintf("type assertion failed for %s (input is %s)", zero.Kind(), res.Kind()))
+	}
+
+	return asserted, nil
 }
 
 // GetKeyByIdent converts a string key to an identifier and returns the value of the

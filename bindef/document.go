@@ -3,8 +3,10 @@ package bindef
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"math/big"
 	"os"
@@ -61,17 +63,19 @@ type SeekPos struct {
 }
 
 type FormatType struct {
-	Type   TypeName   // Format type (e.g. uint8, int8). May be more complex such as byte[n].
-	Id     string     // Field identifier.
-	Name   string     // Human-readable field name.
-	Doc    string     // Documentation.
-	At     SeekPos    // Seek position.
-	Valid  LazyResult // Validation function.
-	If     LazyResult // Only process value on condition.
-	Endian string     // For integer types only, the byte endianness (either "big" or "little").
-	Match  []MagicTag // For magic types only, the pattern(s) that must match.
-	Size   int64      // For byte types only, the size of the byte string.
-	Strip  bool       // For byte types only, whether to strip whitespace or null bytes from the ends of the string.
+	Type       TypeName     // Format type (e.g. uint8, int8). May be more complex such as byte[n].
+	Id         string       // Field identifier.
+	Name       string       // Human-readable field name.
+	Doc        string       // Documentation.
+	At         *SeekPos     // Seek position.
+	Valid      LazyResult   // Validation function.
+	If         LazyResult   // Only process value on condition.
+	Endian     string       // For integer types only, the byte endianness (either "big" or "little").
+	Match      []MagicTag   // For magic types only, the pattern(s) that must match.
+	Size       int64        // For byte types only, the size of the byte string.
+	Strip      bool         // For byte types only, whether to strip whitespace or null bytes from the ends of the string.
+	RawFields  []MapResult  // For structures only, the fields contained in the struct.
+	ProcFields []FormatType // For structures only, the fields contained in the struct as format types.
 }
 
 type MagicTag struct {
@@ -170,10 +174,59 @@ func parseMeta(meta Result) (Meta, error) {
 	}, nil
 }
 
-func parseFormatType(format Result, ns Namespace) (FormatType, error) {
+func getFormatEndian(bin MapResult, base MapResult, ns Namespace) (string, error) {
+	var endian string
+	endianRes, err := GetEvalKeyByIdent[StringResult](bin, "endian", false, ns)
+	if err != nil {
+		return "", err
+	}
+
+	if endianRes == "" {
+		baseEndianRes, err := GetEvalKeyByIdent[StringResult](base, "endian", true, ns)
+		if err != nil {
+			return "", err
+		}
+
+		endian = string(baseEndianRes)
+	} else {
+		endian = string(endianRes)
+	}
+
+	endian = strings.ToLower(endian)
+	if endian != "little" && endian != "big" {
+		return "", fmt.Errorf("endian is not 'little' or 'big'")
+	}
+
+	return endian, nil
+}
+
+var ErrSkipped = fmt.Errorf("format type was skipped because condition is false")
+
+func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, error) {
 	bin, err := ResultIs[MapResult](format)
 	if err != nil {
 		return FormatType{}, err
+	}
+
+	ifRes, err := GetKeyByIdent[LazyResult](bin, "if", false)
+	if err != nil {
+		return FormatType{}, err
+	}
+
+	if ifRes != nil {
+		willParseRes, err := ifRes(ns)
+		if err != nil {
+			return FormatType{}, err
+		}
+
+		willParse, err := ResultIs[BooleanResult](willParseRes)
+		if err != nil {
+			return FormatType{}, err
+		}
+
+		if !willParse {
+			return FormatType{}, ErrSkipped
+		}
 	}
 
 	genTypeRes, err := GetKeyByIdent[Result](bin, "type", true)
@@ -230,19 +283,30 @@ func parseFormatType(format Result, ns Namespace) (FormatType, error) {
 		return FormatType{}, err
 	}
 
-	var atVal SeekPos
+	var atVal *SeekPos = nil
 
 	if atRes != nil {
-		switch atRes.Kind() {
+		var resolvedAt Result
+		if atRes.Kind() == ResultLazy {
+			at, err := atRes.(LazyResult)(ns)
+			if err != nil {
+				return FormatType{}, err
+			}
+			resolvedAt = at
+		} else {
+			resolvedAt = atRes
+		}
+
+		switch resolvedAt.Kind() {
 		case ResultInt, ResultFloat:
-			offsetInt, err := NumberResultAsInt(atRes)
+			offsetInt, err := NumberResultAsInt(resolvedAt)
 			if err != nil {
 				return FormatType{}, err
 			}
 
-			atVal = SeekPos{Offset: offsetInt, Whence: io.SeekStart}
+			atVal = &SeekPos{Offset: offsetInt, Whence: io.SeekStart}
 		case ResultList:
-			atValList, err := ResultIs[ListResult](atRes)
+			atValList, err := ResultIs[ListResult](resolvedAt)
 			if err != nil {
 				return FormatType{}, err
 			}
@@ -263,11 +327,11 @@ func parseFormatType(format Result, ns Namespace) (FormatType, error) {
 
 			switch whenceStr {
 			case StringResult("start"):
-				atVal = SeekPos{Offset: offsetInt, Whence: io.SeekStart}
+				atVal = &SeekPos{Offset: offsetInt, Whence: io.SeekStart}
 			case StringResult("end"):
-				atVal = SeekPos{Offset: offsetInt, Whence: io.SeekEnd}
+				atVal = &SeekPos{Offset: offsetInt, Whence: io.SeekEnd}
 			case StringResult("current"):
-				atVal = SeekPos{Offset: offsetInt, Whence: io.SeekCurrent}
+				atVal = &SeekPos{Offset: offsetInt, Whence: io.SeekCurrent}
 			default:
 				return FormatType{}, fmt.Errorf("at[1]: whence is not a valid seek identifier")
 			}
@@ -277,11 +341,6 @@ func parseFormatType(format Result, ns Namespace) (FormatType, error) {
 	}
 
 	validRes, err := GetKeyByIdent[LazyResult](bin, "valid", false)
-	if err != nil {
-		return FormatType{}, err
-	}
-
-	ifRes, err := GetKeyByIdent[LazyResult](bin, "if", false)
 	if err != nil {
 		return FormatType{}, err
 	}
@@ -327,16 +386,12 @@ func parseFormatType(format Result, ns Namespace) (FormatType, error) {
 			return baseFormat, nil
 		}
 	case TypeUint16, TypeUint32, TypeUint64, TypeInt16, TypeInt32, TypeInt64:
-		endianRes, err := GetKeyByIdent[StringResult](bin, "endian", true)
+		endian, err := getFormatEndian(bin, base, ns)
 		if err != nil {
 			return FormatType{}, err
 		}
 
-		baseFormat.Endian = strings.ToLower(string(endianRes))
-		if baseFormat.Endian != "little" && baseFormat.Endian != "big" {
-			return FormatType{}, fmt.Errorf("endian is not 'little' or 'big'")
-		}
-
+		baseFormat.Endian = endian
 		return baseFormat, nil
 	case TypeByte:
 		strip, err := GetKeyByIdent[BooleanResult](bin, "strip", false)
@@ -374,6 +429,28 @@ func parseFormatType(format Result, ns Namespace) (FormatType, error) {
 			return FormatType{}, fmt.Errorf("byte size must be numeric")
 		}
 
+		return baseFormat, nil
+	case TypeStruct:
+		fields, err := GetKeyByIdent[ListResult](bin, "fields", true)
+		if err != nil {
+			return FormatType{}, err
+		}
+
+		endian, err := getFormatEndian(bin, base, ns)
+		if err != nil {
+			return FormatType{}, err
+		}
+
+		for _, field := range fields {
+			element, err := ResultIs[MapResult](field)
+			if err != nil {
+				return FormatType{}, err
+			}
+
+			baseFormat.RawFields = append(baseFormat.RawFields, element)
+		}
+
+		baseFormat.Endian = endian
 		return baseFormat, nil
 	}
 
@@ -464,8 +541,107 @@ func readInt(handle *os.File, format FormatType) (Result, error) {
 }
 
 type MetaPair struct {
-	Key   string
-	Value any
+	Field FormatType
+	Value Result
+}
+
+func processType(handle *os.File, format *FormatType, ns Namespace) (res Result, err error) {
+	if format.At != nil {
+		if _, err := handle.Seek(format.At.Offset, format.At.Whence); err != nil {
+			return nil, err
+		}
+	}
+
+	var value Result
+	switch format.Type {
+	case TypeMagic:
+		if err := checkMagic(handle, *format); err != nil {
+			return nil, err
+		}
+
+		return nil, nil
+	case TypeUint8, TypeUint16, TypeUint32, TypeUint64, TypeInt8, TypeInt16, TypeInt32, TypeInt64:
+		num, err := readInt(handle, *format)
+
+		if err != nil {
+			return nil, err
+		}
+
+		value = num
+	case TypeByte:
+		byteSlice := make([]byte, format.Size)
+		if _, err := handle.Read(byteSlice); err != nil {
+			return nil, err
+		}
+
+		if format.Strip {
+			trimmed := bytes.TrimFunc(byteSlice, func(r rune) bool {
+				return unicode.IsSpace(r) || r == '\x00'
+			})
+
+			value = StringResult(trimmed)
+		} else {
+			value = StringResult(byteSlice)
+		}
+	case TypeStruct:
+		mapping := MapResult{}
+
+		// special namespace for identifiers within a struct so that they can
+		// be referred using their names directly while also avoiding polluting
+		// the global namespace.
+		currentNs := Namespace{}
+		maps.Copy(currentNs, ns)
+
+		inherited := MapResult{IdentResult("endian"): StringResult(format.Endian)}
+
+		for _, field := range format.RawFields {
+			fieldFormat, err := ParseFormatType(field, currentNs, inherited)
+			if err != nil {
+				if errors.Is(err, ErrSkipped) {
+					continue
+				}
+				return nil, err
+			}
+
+			res, err := processType(handle, &fieldFormat, currentNs)
+			if err != nil {
+				return nil, err
+			}
+
+			if fieldFormat.Id != "" {
+				mapping[IdentResult(fieldFormat.Id)] = res
+				currentNs[IdentResult(fieldFormat.Id)] = res
+			}
+
+			format.ProcFields = append(format.ProcFields, fieldFormat)
+		}
+
+		value = mapping
+	default:
+		return nil, fmt.Errorf("%s is not currently supported", format.Type)
+	}
+
+	if format.Id != "" {
+		ns[IdentResult(format.Id)] = value
+	}
+
+	if format.Valid != nil {
+		isValidRes, err := format.Valid(ns)
+		if err != nil {
+			return nil, err
+		}
+
+		isValid, err := ResultIs[BooleanResult](isValidRes)
+		if err != nil {
+			return nil, err
+		}
+
+		if !isValid {
+			return nil, fmt.Errorf("value for %q is invalid (has value %v)", format.Id, value)
+		}
+	}
+
+	return value, nil
 }
 
 func ApplyBDF(document Result, targetFile string) ([]MetaPair, error) {
@@ -490,99 +666,26 @@ func ApplyBDF(document Result, targetFile string) ([]MetaPair, error) {
 	ns := map[Result]Result{}
 
 	for idx, res := range binarySeq {
-		formatType, err := parseFormatType(res, ns)
+		formatType, err := ParseFormatType(res, ns, nil)
 		if err != nil {
+			if errors.Is(err, ErrSkipped) {
+				continue
+			}
 			return nil, fmt.Errorf("binary[%d]: %w", idx, err)
 		}
 
-		if formatType.If != nil {
-			willParseRes, err := formatType.If(ns)
-			if err != nil {
+		value, err := processType(handle, &formatType, ns)
+		if err != nil {
+			var magicErr ErrMagic
+			if errors.Is(err, magicErr) {
 				return nil, err
 			}
 
-			willParse, err := ResultIs[BooleanResult](willParseRes)
-			if err != nil {
-				return nil, err
-			}
-
-			if !willParse {
-				continue
-			}
+			return nil, fmt.Errorf("binary[%d]: %w", idx, err)
 		}
 
-		var emptyPos SeekPos
-		if formatType.At != emptyPos {
-			if _, err := handle.Seek(formatType.At.Offset, formatType.At.Whence); err != nil {
-				return nil, fmt.Errorf("binary[%d].at: %w", idx, err)
-			}
-		}
-
-		var value Result
-		isMagic := false
-		switch formatType.Type {
-		case TypeMagic:
-			if err := checkMagic(handle, formatType); err != nil {
-				return nil, err
-			}
-
-			isMagic = true
-		case TypeUint8, TypeUint16, TypeUint32, TypeUint64, TypeInt8, TypeInt16, TypeInt32, TypeInt64:
-			num, err := readInt(handle, formatType)
-
-			if err != nil {
-				return nil, fmt.Errorf("binary[%d]: %w", idx, err)
-			}
-
-			value = num
-		case TypeByte:
-			byteSlice := make([]byte, formatType.Size)
-			if _, err := handle.Read(byteSlice); err != nil {
-				return nil, fmt.Errorf("binary[%d]: %w", idx, err)
-			}
-
-			if formatType.Strip {
-				trimmed := bytes.TrimFunc(byteSlice, func(r rune) bool {
-					return unicode.IsSpace(r) || r == '\x00'
-				})
-
-				value = StringResult(trimmed)
-			} else {
-				value = StringResult(byteSlice)
-			}
-		default:
-			return nil, fmt.Errorf("binary[%d].type: %s is not currently supported", idx, formatType.Type)
-		}
-
-		if isMagic {
-			continue
-		}
-
-		var zero string
-		if formatType.Id != zero {
-			ns[IdentResult(formatType.Id)] = value
-		}
-
-		if formatType.Valid != nil {
-			isValidRes, err := formatType.Valid(ns)
-			if err != nil {
-				return nil, err
-			}
-
-			isValid, err := ResultIs[BooleanResult](isValidRes)
-			if err != nil {
-				return nil, err
-			}
-
-			if !isValid {
-				return nil, fmt.Errorf("binary[%d] contains an invalid value", idx)
-			}
-		}
-
-		if formatType.Name != zero {
-			contents = append(contents, MetaPair{formatType.Name, value})
-		} else if formatType.Id != zero && !strings.HasPrefix(formatType.Id, "_") {
-			contents = append(contents, MetaPair{formatType.Id, value})
+		if formatType.Name != "" || formatType.Id != "" {
+			contents = append(contents, MetaPair{formatType, value})
 		}
 	}
 

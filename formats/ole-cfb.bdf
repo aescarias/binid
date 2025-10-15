@@ -1,3 +1,6 @@
+// BinDef for Microsoft's Compound File Binary Format
+// Documented at https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cfb/53989ce4-7b05-4f8d-829b-d08d6148375b
+
 {
   meta: {
     bdf: "0.1",
@@ -8,25 +11,45 @@
       "Also known as the OLE (Object Linking and Embedding) file format, " +
       "it is a container format developed by Microsoft with features resembling " +
       "those of a file system such as FAT. This format is seen in older " +
-      "Microsoft Office/Works documents, alongside other Windows formats such as MSI." 
+      "Microsoft Office/Works documents, alongside other Windows-centric formats such as MSI." 
   },
   binary: [
-    { 
-      type: magic, 
-      match: [
-        "\x0e\x11\xfc\x0d\xd0\xcf\x11\x0e",
-        "\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" // used by beta versions of the format
-      ] 
-    },
-    { type: byte[16], id: clsid, name: "CLSID" },
-
-    // TODO: The format is usually little endian but it may be big endian if 
-    // byteOrder is FE FF.
-    { type: uint16,  endian: "little", id: minorVersion, name: "Minor version" },
-    { type: uint16,  endian: "little", id: majorVersion, name: "Major version" },
-    { type: byte[2], id: byteOrder,    name: "Byte order" },
-    { type: uint16,  endian: "little", id: sectorSize,   name: "Sector size (bytes)"},
-    { type: uint16,  endian: "little", id: shortSectorSize, name: "Short sector size (bytes)"},
-    { type: byte[3], id: _reserved }
+    { id: header,
+      type: struct,
+      name: "Header",
+      endian: "little", // a byte order field exists but is always expected to be LE
+      fields: [
+        { type: magic, 
+          match: [
+            "\x0e\x11\xfc\x0d\xd0\xcf\x11\x0e",
+            "\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" // used by beta versions of the format
+          ] 
+        },
+        { type: byte[16], id: _clsid, 
+          valid: _clsid == "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" },
+        { type: uint16,   id: minorVersion,    name: "Minor version" },
+        { type: uint16,   id: majorVersion,    name: "Major version" },
+        { type: byte[2],  id: _byteOrder,      
+          valid: _byteOrder == "\xfe\xff" },
+        { type: uint16,   id: sectorShift,      name: "Sector size (as a power of 2)"},
+        { type: uint16,   id: shortSectorShift, name: "Short sector size (as a power of 2)"},
+        { type: byte[6],  id: _reserved, 
+          valid: _reserved == "\x00\x00\x00\x00\x00\x00" 
+        },
+        { type: uint32, 
+          id: nDirectorySectors, 
+          name: "Directory sectors",
+          valid: majorVersion != 3 || nDirectorySectors == 0
+        },
+        { type: uint32, id: fatSectors,       name: "FAT sectors" },
+        { type: uint32, id: firstDirSector,   name: "First directory sector location" },
+        { type: uint32, id: transactionSig,   name: "Transaction signature" },
+        { type: uint32, id: miniStreamCutoff, name: "Mini stream cutoff size" },
+        { type: uint32, id: firstShortSector, name: "First short sector location" },
+        { type: uint32, id: nShortSectors,    name: "Short sectors" },
+        { type: uint32, id: firstDIFATSector, name: "First DIFAT sector location" },
+        { type: uint32, id: nDIFATSectors, name: "DIFAT sectors" },
+      ]
+    }
   ]
 }

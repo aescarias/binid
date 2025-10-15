@@ -1,6 +1,6 @@
 = The BinDef Language Reference
 Ángel Carias <lotta.dev@outlook.com>
-v0.1, 2025-10-11
+v0.2, 2025-10-14
 :toc: auto
 :sectnums: |,all|
 
@@ -10,13 +10,17 @@ WARNING: This document describes a format that is in early development. Many thi
 
 The BinDef (Binary Definition) language is a declarative language for describing a binary file format. BinDef provides abstractions for validating magic signatures, reading structures, dealing with endianness, and more, under a simple JSON-like format. 
 
-BinDef was created for use with the file identification tool BinID allowing this tool to be extensible. While describing a /binary format in an imperative language such as C or Go (which the reference BinDef implementation uses) is definitely possible, the objective of the BinID tool makes this task tiresome as similar patterns and boilerplate emerge.
+BinDef was created for use with the file identification tool BinID allowing this tool to be extensible. While describing a binary format in an imperative language such as C or Go (which the reference BinDef implementation uses) is definitely possible, the objective of the BinID tool makes this task tiresome as similar patterns and boilerplate emerge.
 
 Hence, the need was born for a simple language like BinDef that allows developers to quickly describe the contents of a file format.
 
 == Comments
 
-In BinDef, single line comments start with `//` and extend to the end of line.
+Comments allow definition authors to embed annotations or explanations within the definition file. Comments have no syntactical meaning and are ignored by the runtime.
+
+BinDef supports _line comments_ and _block comments_.
+
+Line comments start with `//` and extend to the end of line.
 
 [source,javascript]
 ----
@@ -28,7 +32,22 @@ In BinDef, single line comments start with `//` and extend to the end of line.
 }
 ----
 
-BinDef does not currently support block comments (`/* comment */`). This will come in the near future.
+NOTE: Added in version 0.2
+
+Block comments start with `/*` and extend to the end of the first `*/` found. Block comments can hence span multiple lines and occur anywhere within a BinDef document.
+
+[source,javascript]
+----
+/* this is a block comment 
+   that spans multiple lines
+*/
+{
+  meta: {
+    /* it may appear here */
+    bdf: /* or even here */ "0.1"
+  }
+}
+----
 
 == Data Types
 
@@ -440,6 +459,14 @@ For `a || b`, if `a` is truthy, then `b` is not computed and the result is immed
 
 For `a && b`, if `a` is falsy, then `b` is not computed and the result is immediately false.
 
+=== Ternary Conditions
+
+NOTE: Added in version 0.2
+
+Ternary conditions allow a BinDef runtime to evaluate expressions based on whether a condition was met or not. 
+
+A ternary condition follows the form `cond ? truthy : falsy` where `cond` is the condition to evaluate, `truthy` is the operation performed if the condition is true, and `falsy` is the operation performed otherwise.
+
 === Truthiness
 
 A value is considered truthy when:
@@ -514,6 +541,7 @@ The currently available types are
 - The unsigned integer types `uint8`, `uint16`, `uint32`, and `uint64`.
 - The signed integer types `int8`, `int16`, `int32`, and `int64`.
 - The `byte[n]` type.
+- The `struct` type.
 
 If a BinDef processor finds a type that it doesn't recognize, it shall stop parsing the document and issue a warning.
 
@@ -619,7 +647,7 @@ It is possible that a field may only appear if a certain condition is met. For e
 
 Here, `version` being 1 determines whether `timestamp` is parsed before `code` or whether `code` is the next field in the sequence. 
 
-It is worth noting that the `if` condition is checked before performing any seek operations, so if the condition is not met, the seek will not occur.
+It is worth noting that the `if` condition is checked before processing any other fields, so if the condition is not met, no seek operations or identifier declarations will occur.
 
 === The `magic` type
 
@@ -698,6 +726,48 @@ Of course, the length of the byte sequence may also be fetched from another iden
 ----
 
 The provided `size` must be a numeric type. If the numeric type is a float, it is truncated and converted to an integer.
+
+=== The `struct` type
+
+NOTE: Added in version 0.2
+
+Structures provide a convenient way of grouping similar sections of a binary format together. A structure is declared with the `struct` format type and contains a `fields` key which is a list of the format types that conform the structure.
+
+For example, a file header may be grouped into a structure as follows:
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: struct,
+      id: header,
+      endian: "little",
+      fields: [
+        { type: magic,  match: "SFF\x00"}, // some file format
+        { type: uint8,  id: version },
+        { type: uint16, id: flags },
+        { type: uint16, id: offset },
+      ]
+    }
+  ]
+}
+----
+
+This encodes a structure containing 4 fields. Note how the structure specifies the `endian` key rather than the fields themselves. If an integer format field does not specify an endianness, it is simply inherited from the structure.
+
+Accessing fields in another structure can be done via attribute access syntax (`struct.item`):
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: struct, id: header }, // [...]
+    { type: struct, id: block, at: header.offset } // [...]
+  ]
+}
+----
 
 == Versioning
 

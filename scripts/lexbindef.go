@@ -68,6 +68,7 @@ func main() {
 	fmt.Printf("name: %s\n", meta.Name)
 	fmt.Printf("mime type(s): %s\n", strings.Join(meta.Mime, ", "))
 	fmt.Printf("extension(s): %s\n", strings.Join(meta.Exts, ", "))
+	fmt.Printf("docs: %s\n", meta.Doc)
 
 	fmt.Println()
 	fmt.Println("== details")
@@ -78,6 +79,6 @@ func main() {
 	}
 
 	for _, pair := range contents {
-		fmt.Printf("%s: %v\n", pair.Key, pair.Value)
+		bindef.ShowMetadataField(pair, 0)
 	}
 }

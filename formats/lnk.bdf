@@ -10,8 +10,8 @@
   },
   binary: [
     { type: magic, match: "\x4c\x00\x00\x00" },
-    { type: byte[16], id: clsid,        name: "CLSID", 
-      valid: clsid == "\x01\x14\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00\x46" },
+    { type: byte[16], id: _clsid, 
+      valid: _clsid == "\x01\x14\x02\x00\x00\x00\x00\x00\xc0\x00\x00\x00\x00\x00\x00\x46" },
     { type: uint32,   id: flags,        endian: "little", name: "Flags" },
     { type: uint32,   id: attributes,   endian: "little", name: "Attributes" },
     { type: uint64,   id: creationTime, endian: "little", name: "Creation time" },

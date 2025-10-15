@@ -99,12 +99,50 @@ func ReportError(filepath string, source []byte, err error) {
 				trimmed := strings.TrimLeftFunc(string(lineStr), unicode.IsSpace)
 				diff := len(string(lineStr)) - len(trimmed)
 
+				arrowAlign := max(column-diff-1, 0)
 				fmt.Println("   ", trimmed)
-				fmt.Println("   ", strings.Repeat(" ", column-diff-1)+strings.Repeat("^", length))
+				fmt.Println("   ", strings.Repeat(" ", arrowAlign)+strings.Repeat("^", length))
 				break
 			}
 		}
 	} else {
 		fmt.Println(err)
+	}
+}
+
+// ShowMetadataField prints a pair containing a format type and a value with the
+// specified indent level. Spaces are used for indentation.
+func ShowMetadataField(pair MetaPair, indent int) {
+	indentStr := strings.Repeat("  ", indent)
+
+	var key string
+	if pair.Field.Name != "" {
+		key = pair.Field.Name
+	} else {
+		key = pair.Field.Id
+		if strings.HasPrefix(key, "_") || key == "" {
+			return
+		}
+	}
+
+	switch f := pair.Field; f.Type {
+	case TypeMagic:
+		return
+	case TypeByte:
+		fmt.Printf("%s%s: %q\n", indentStr, key, pair.Value)
+	case TypeStruct:
+		mapping := pair.Value.(MapResult)
+
+		fmt.Printf("%s%s:\n", indentStr, key)
+		for _, field := range f.ProcFields {
+			id := IdentResult(field.Id)
+
+			ShowMetadataField(
+				MetaPair{Field: field, Value: mapping[id]},
+				indent+1,
+			)
+		}
+	default:
+		fmt.Printf("%s%s: %v\n", indentStr, key, pair.Value)
 	}
 }

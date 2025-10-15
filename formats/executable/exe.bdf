@@ -2,8 +2,11 @@
   meta: {
     bdf: "0.1",
     name: "MZ Portable Executable",
-    mime: ["application/x-msdownload"],
-    exts: [".exe", ".dll"],
+    mime: [
+      "application/vnd.microsoft.portable-executable", 
+      "application/x-msdownload"
+    ],
+    exts: [".exe", ".dll", ".sys"],
   },
   binary: [
     { type: magic, match: "MZ" } 

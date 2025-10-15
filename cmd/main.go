@@ -6,14 +6,13 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"strings"
 
 	"github.com/aescarias/binid/bindef"
 )
 
-var VERSION = "0.2.0"
+var VERSION = "0.3.0"
 
 func ParseDef(filepath string) bindef.Result {
 	bdfData, err := os.ReadFile(filepath)
@@ -135,7 +134,12 @@ func main() {
 
 	if inputStat.IsDir() {
 		fmt.Printf("%s is a directory\n", os.Args[1])
-		os.Exit(1)
+		os.Exit(0)
+	}
+
+	if inputStat.Size() <= 0 {
+		fmt.Printf("%s is empty\n", os.Args[1])
+		os.Exit(0)
 	}
 
 	found := false
@@ -180,22 +184,7 @@ func main() {
 		}
 
 		for _, pair := range match {
-			switch refVal := reflect.ValueOf(pair.Value); refVal.Kind() {
-			case reflect.Slice, reflect.Array:
-				fmt.Printf("%s (%v):\n", pair.Key, refVal.Len())
-				for idx := range refVal.Len() {
-					fmt.Printf("  %s\n", refVal.Index(idx).String())
-				}
-			case reflect.Map:
-				fmt.Printf("%s (%v):\n", pair.Key, refVal.Len())
-				for _, inKey := range refVal.MapKeys() {
-					fmt.Printf("  %s: %s\n", inKey.String(), refVal.MapIndex(inKey).String())
-				}
-			case reflect.String:
-				fmt.Printf("%s: %q\n", pair.Key, pair.Value)
-			default:
-				fmt.Printf("%s: %v\n", pair.Key, pair.Value)
-			}
+			bindef.ShowMetadataField(pair, 0)
 		}
 	}
 

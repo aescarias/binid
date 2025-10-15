@@ -29,3 +29,8 @@ func (s *Scanner[T]) Cursor() T {
 func (s *Scanner[T]) Peek(n int) []T {
 	return s.Data[s.Position+1 : s.Position+1+n]
 }
+
+// CanPeek reports whether peeking n items is possible.
+func (s *Scanner[T]) CanPeek(n int) bool {
+	return s.Position+1 < len(s.Data) && s.Position+1+n < len(s.Data)
+}

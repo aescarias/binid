@@ -1,0 +1,25 @@
+{
+  meta: {
+    bdf: "0.2",
+    name: "Quite Okay Audio (QOA) data",
+    mime: ["audio/x-qoa"],
+    exts: [".qoa"]
+  },
+  binary: [
+    { type: magic, match: "qoaf" },
+    { id: samples, type: uint32, endian: "big"},
+    { id: frame,
+      type: struct, // struct[ceil(samples / (256 * 20))],
+      endian: "big",
+      fields: [
+        { id: numChannels, type: uint8 },
+        // todo: either introduce a uint24 type or add a process function
+        //       that performs bytes[0]<<16 | bytes[1]<<8 | bytes[2]
+        { id: sampleRate, type: byte[3] },
+        { id: frameSamples, type: uint16 },
+        { id: frameSize, type: uint16 },
+        { id: frameData, type: byte[frameSize] }
+      ]
+    }
+  ]
+}

@@ -50,7 +50,6 @@ func doBinOpEquals(left, right Result) BooleanResult {
 }
 
 var ErrCannotCompare = fmt.Errorf("cannot compare these types")
-var ErrCannotBoolean = fmt.Errorf("cannot convert result to boolean")
 
 func doBinOpLt(left, right Result) (BooleanResult, error) {
 	if left.Kind() == ResultInt && right.Kind() == ResultInt {
@@ -95,6 +94,40 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 	left, err := Evaluate(node.Left, namespace)
 	if err != nil {
 		return nil, err
+	}
+
+	// these cases are separate because we support short-circuiting
+	switch node.Op.Kind {
+	case TokenLogicalOr:
+		if leftBool := ResultAsBoolean(left); leftBool {
+			return BooleanResult(true), nil
+		}
+
+		right, err := Evaluate(node.Right, namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		if rightBool := ResultAsBoolean(right); rightBool {
+			return BooleanResult(true), nil
+		}
+
+		return BooleanResult(false), nil
+	case TokenLogicalAnd:
+		if leftBool := ResultAsBoolean(left); !leftBool {
+			return BooleanResult(false), nil
+		}
+
+		right, err := Evaluate(node.Right, namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		if rightBool := ResultAsBoolean(right); !rightBool {
+			return BooleanResult(false), nil
+		}
+
+		return BooleanResult(true), nil
 	}
 
 	right, err := Evaluate(node.Right, namespace)
@@ -370,54 +403,6 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 			}
 		}
 		return result || doBinOpEquals(left, right), nil
-	case TokenLogicalOr:
-		leftBool, err := ResultAsBoolean(left)
-		if err != nil && errors.Is(err, ErrCannotBoolean) {
-			return nil, LangError{
-				ErrorRuntime,
-				node.Position(),
-				fmt.Sprintf("left operand %s cannot be converted to be a boolean", left.Kind()),
-			}
-		}
-
-		if leftBool {
-			return BooleanResult(true), nil
-		}
-
-		rightBool, err := ResultAsBoolean(right)
-		if err != nil && errors.Is(err, ErrCannotBoolean) {
-			return nil, LangError{
-				ErrorRuntime,
-				node.Position(),
-				fmt.Sprintf("right operand %s cannot be converted to be a boolean", right.Kind()),
-			}
-		}
-
-		return leftBool || rightBool, nil
-	case TokenLogicalAnd:
-		leftBool, err := ResultAsBoolean(left)
-		if err != nil && errors.Is(err, ErrCannotBoolean) {
-			return nil, LangError{
-				ErrorRuntime,
-				node.Position(),
-				fmt.Sprintf("left operand %s cannot be converted to be a boolean", left.Kind()),
-			}
-		}
-
-		if !leftBool {
-			return BooleanResult(false), nil
-		}
-
-		rightBool, err := ResultAsBoolean(right)
-		if err != nil && errors.Is(err, ErrCannotBoolean) {
-			return nil, LangError{
-				ErrorRuntime,
-				node.Position(),
-				fmt.Sprintf("right operand %s cannot be converted to be a boolean", right.Kind()),
-			}
-		}
-
-		return leftBool && rightBool, nil
 	default:
 		return nil, LangError{
 			ErrorRuntime,
@@ -487,15 +472,7 @@ func EvaluateUnaryOp(node UnaryOpNode, namespace Namespace) (Result, error) {
 			return nil, err
 		}
 
-		asBool, err := ResultAsBoolean(result)
-		if err != nil && errors.Is(err, ErrCannotBoolean) {
-			return nil, LangError{
-				ErrorRuntime,
-				node.Position(),
-				fmt.Sprintf("%s cannot be converted to be a boolean", result.Kind()),
-			}
-		}
-
+		asBool := ResultAsBoolean(result)
 		return !asBool, nil
 	default:
 		return nil, LangError{
@@ -699,6 +676,19 @@ func EvaluateSubscript(node SubscriptNode, namespace Namespace) (Result, error) 
 	return value, nil
 }
 
+func EvaluateTernary(node TernaryNode, namespace Namespace) (Result, error) {
+	cond, err := Evaluate(node.If, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	if ResultAsBoolean(cond) {
+		return Evaluate(node.Then, namespace)
+	}
+
+	return Evaluate(node.Else, namespace)
+}
+
 func EvaluateAttr(node AttrNode, namespace Namespace) (Result, error) {
 	expr, err := Evaluate(node.Expr, namespace)
 	if err != nil {
@@ -757,6 +747,8 @@ func Evaluate(tree Node, namespace Namespace) (Result, error) {
 		return EvaluateList(*tree.(*ListNode), namespace)
 	case NodeSubscript:
 		return EvaluateSubscript(*tree.(*SubscriptNode), namespace)
+	case NodeTernary:
+		return EvaluateTernary(*tree.(*TernaryNode), namespace)
 	default:
 		return nil, LangError{
 			ErrorRuntime,
@@ -767,23 +759,23 @@ func Evaluate(tree Node, namespace Namespace) (Result, error) {
 }
 
 // ResultAsBoolean reports the result as a boolean.
-func ResultAsBoolean(result Result) (BooleanResult, error) {
+func ResultAsBoolean(result Result) BooleanResult {
 	switch result.Kind() {
 	case ResultInt:
 		isZero := result.(IntegerResult).Cmp(new(big.Int))
-		return BooleanResult(isZero != 0), nil
+		return BooleanResult(isZero != 0)
 	case ResultFloat:
-		return BooleanResult(result.(FloatResult) != 0.0), nil
+		return BooleanResult(result.(FloatResult) != 0.0)
 	case ResultBoolean:
-		return result.(BooleanResult), nil
+		return result.(BooleanResult)
 	case ResultMap:
-		return BooleanResult(len(result.(MapResult)) > 0), nil
+		return BooleanResult(len(result.(MapResult)) > 0)
 	case ResultList:
-		return BooleanResult(len(result.(ListResult)) > 0), nil
+		return BooleanResult(len(result.(ListResult)) > 0)
 	case ResultString:
-		return BooleanResult(len(result.(StringResult)) > 0), nil
+		return BooleanResult(len(result.(StringResult)) > 0)
 	default:
-		return BooleanResult(false), ErrCannotBoolean
+		return BooleanResult(true)
 	}
 }
 
@@ -812,8 +804,8 @@ func MustEvaluateLazily(node Node) (bool, error) {
 		}
 
 		return lazy, nil
-	case NodeAttr:
-		// attr requires a namespace
+	case NodeAttr, NodeTernary:
+		// attr and ternary require a namespace
 		return true, nil
 	case NodeSubscript:
 		subscript := node.(*SubscriptNode)

@@ -65,6 +65,12 @@ type SubscriptNode struct {
 	Item Node
 }
 
+type TernaryNode struct {
+	If   Node
+	Then Node
+	Else Node
+}
+
 type CallNode struct {
 	Expr      Node
 	Arguments []Node
@@ -81,6 +87,7 @@ const (
 	NodeList      NodeKind = "List"
 	NodeAttr      NodeKind = "Attr"
 	NodeSubscript NodeKind = "Subscript"
+	NodeTernary   NodeKind = "Ternary"
 	NodeCall      NodeKind = "Call"
 )
 
@@ -118,6 +125,14 @@ func (in *SubscriptNode) Position() Position {
 	return Position{
 		Start: in.Expr.Position().Start,
 		End:   in.Item.Position().End,
+	}
+}
+
+func (tn *TernaryNode) Type() NodeKind { return NodeTernary }
+func (tn *TernaryNode) Position() Position {
+	return Position{
+		Start: tn.If.Position().Start,
+		End:   tn.Else.Position().End,
 	}
 }
 
@@ -449,4 +464,41 @@ func (ps *Parser) ParseLogicalOr() (Node, error) {
 	return left, nil
 }
 
-func (ps *Parser) Parse() (Node, error) { return ps.ParseLogicalOr() }
+func (ps *Parser) ParseTernary() (Node, error) {
+	cond, err := ps.ParseLogicalOr()
+	if err != nil {
+		return nil, err
+	}
+
+	if ps.IsDone() || ps.Cursor().Kind != TokenQuestion {
+		return cond, nil
+	}
+
+	ps.Advance(1)
+
+	truthy, err := ps.Parse()
+	if err != nil {
+		return nil, err
+	}
+
+	if ps.IsDone() || ps.Cursor().Kind != TokenColon {
+		return nil, LangError{
+			ErrorSyntax,
+			ps.Cursor().Position,
+			fmt.Sprintf("expected ternary else, not %s", ps.Cursor().Kind),
+		}
+	}
+
+	ps.Advance(1)
+
+	falsy, err := ps.Parse()
+	if err != nil {
+		return nil, err
+	}
+
+	return &TernaryNode{If: cond, Then: truthy, Else: falsy}, nil
+}
+
+func (ps *Parser) Parse() (Node, error) {
+	return ps.ParseTernary()
+}

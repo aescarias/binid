@@ -40,6 +40,7 @@ const (
 	TokenNotEq                         // !=
 	TokenLogicalAnd                    // &&
 	TokenLogicalOr                     // ||
+	TokenQuestion                      // ?
 	TokenIdentifier
 	TokenKeyword // true, false
 	TokenInteger
@@ -109,6 +110,8 @@ func (t TokenKind) String() string {
 		return "LogicalAnd"
 	case TokenLogicalOr:
 		return "LogicalOr"
+	case TokenQuestion:
+		return "Question"
 	case TokenIdentifier:
 		return "Identifier"
 	case TokenKeyword:
@@ -371,6 +374,7 @@ var singleTokenMap = map[byte]TokenKind{
 	']': TokenRBracket,
 	',': TokenComma,
 	':': TokenColon,
+	'?': TokenQuestion,
 	'.': TokenDot,
 	'+': TokenPlus,
 	'-': TokenMinus,
@@ -436,6 +440,25 @@ func (lx *Lexer) Process() error {
 			switch nc := string(lx.Peek(1)); nc {
 			case "/":
 				for !lx.IsDone() && lx.Cursor() != '\n' {
+					lx.Advance(1)
+				}
+				continue
+			case "*":
+				for !lx.IsDone() {
+					if !lx.CanPeek(2) {
+						return LangError{
+							Kind:     ErrorSyntax,
+							Position: Position{Start: lx.Position, End: lx.Position + 1},
+							Message:  "unterminated block comment",
+						}
+					}
+
+					maybeEnd := []byte{lx.Cursor(), lx.Peek(1)[0]}
+					if slices.Equal(maybeEnd, []byte("*/")) {
+						lx.Advance(2)
+						break
+					}
+
 					lx.Advance(1)
 				}
 				continue
