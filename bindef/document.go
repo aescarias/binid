@@ -76,6 +76,7 @@ type FormatType struct {
 	Strip      bool         // For byte types only, whether to strip whitespace or null bytes from the ends of the string.
 	RawFields  []MapResult  // For structures only, the fields contained in the struct.
 	ProcFields []FormatType // For structures only, the fields contained in the struct as format types.
+	VarValue   LazyResult   // For variable definitions, the value contained.
 }
 
 type MagicTag struct {
@@ -393,6 +394,14 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 
 		baseFormat.Endian = endian
 		return baseFormat, nil
+	case TypeVar:
+		contents, err := GetKeyByIdent[LazyResult](bin, "value", true)
+		if err != nil {
+			return FormatType{}, err
+		}
+
+		baseFormat.VarValue = contents
+		return baseFormat, nil
 	case TypeByte:
 		strip, err := GetKeyByIdent[BooleanResult](bin, "strip", false)
 		if err != nil {
@@ -569,6 +578,13 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 		}
 
 		value = num
+	case TypeVar:
+		res, err := format.VarValue(ns)
+		if err != nil {
+			return nil, err
+		}
+
+		value = res
 	case TypeByte:
 		byteSlice := make([]byte, format.Size)
 		if _, err := handle.Read(byteSlice); err != nil {

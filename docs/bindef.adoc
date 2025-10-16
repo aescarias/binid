@@ -1,6 +1,6 @@
 = The BinDef Language Reference
 Ángel Carias <lotta.dev@outlook.com>
-v0.3, 2025-10-15
+v0.3, 2025-10-16
 :toc: auto
 :sectnums: |,all|
 
@@ -544,13 +544,14 @@ The single mapping in the document contains two keys `meta` and `binary`. `meta`
 
 Each mapping in the `binary` list is a _format type_. All format types must contain the `type` key whose value is an identifier for a type.
 
-The currently available types are
+The currently available types are:
 
 - The file signature type `magic`.
 - The unsigned integer types `uint8`, `uint16`, `uint32`, and `uint64`.
 - The signed integer types `int8`, `int16`, `int32`, and `int64`.
 - The `byte[n]` type.
 - The `struct` type.
+- The variable definition type `var`.
 
 If a BinDef processor finds a type that it doesn't recognize, it shall stop parsing the document and issue a warning.
 
@@ -777,6 +778,14 @@ Accessing fields in another structure can be done via attribute access syntax (`
   ]
 }
 ----
+
+=== The `var` type
+
+NOTE: Added in version 0.3
+
+The `var` type allows BinDef to define values not contained within the binary sequence. This is useful for performing calculations within the document, for providing additional metadata, or for reading values that are not satisfied by the available format types. 
+
+The `var` type requires an additional field `value` specifying the expression that will be assigned to the variable.
 
 == Versioning
 

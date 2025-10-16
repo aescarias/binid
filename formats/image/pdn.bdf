@@ -1,12 +1,17 @@
 {
   meta: {
-    bdf: "0.1",
+    bdf: "0.3",
     name: "Paint.NET image file",
     mime: ["image/x-paintnet"],
     exts: [".pdn"],
   },
   binary: [
     { type: magic, match: "PDN3" },
+    // rudimentary uint24 parsing
+    { type: uint8, id: _hsb1 }, { type: uint8, id: _hsb2 }, { type: uint8, id: _hsb3 }, 
+    { type: var, id: headerSize, name: "Header size", value: _hsb3<<16 | _hsb2<<8 | _hsb1 },
+    
+    // { type: byte[headerSize], id: header, name: "XML header" }
     // TODO: The next value is a little-endian 24-bit header size followed by
     // XML header data. After the header follows NRBF-serialized content.
     // Hints about the format structure can be found in the pypdn source code.
