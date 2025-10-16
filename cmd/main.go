@@ -142,6 +142,8 @@ func main() {
 		os.Exit(0)
 	}
 
+	fmt.Printf("matching %s\n", os.Args[1])
+
 	found := false
 	for defPath, defResult := range defs {
 		match, err := bindef.ApplyBDF(defResult, os.Args[1])

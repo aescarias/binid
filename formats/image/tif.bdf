@@ -1,0 +1,33 @@
+{
+  meta: {
+    bdf: "0.2",
+    name: "Tagged Image File (TIF/TIFF)",
+    exts: [".tiff", ".tif"],
+    mime: ["image/tiff", "image/tiff-fx"]
+  },
+  binary: [
+    { id: _tifEndian, type: magic, match: ["II", "MM"] },
+    { id: header,
+      name: "Header",
+      type: struct,
+      endian: _tifEndian == "II" ? "little" : "big",
+      at: 0,
+      fields: [
+        { id: byteOrder, type: magic, match: ["II", "MM"], name: "Byte order" },
+        { id: version, type: uint16, valid: version == 0x2a, name: "Version" },
+        { id: ifdOffset, type: uint32, name: "First IFD at" }
+      ]
+    },
+    { id: imageFileDir,
+      name: "Image file directory (IFD) #1",
+      type: struct,
+      endian: header.byteOrder == "II" ? "little" : "big",
+      at: header.ifdOffset,
+      fields: [
+        { id: tagCount, type: uint16, name: "Number of tags" },
+        { id: tags, type: byte[tagCount * 12], name: "Tag data" },
+        { id: nextIfd, type: uint32, name: "Next IFD offset" }
+      ]
+    }
+  ]
+}

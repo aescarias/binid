@@ -1,6 +1,6 @@
 = The BinDef Language Reference
 Ángel Carias <lotta.dev@outlook.com>
-v0.2, 2025-10-14
+v0.3, 2025-10-15
 :toc: auto
 :sectnums: |,all|
 
@@ -328,6 +328,15 @@ If `a` and `b` are numeric types, `a * b` returns the product of a and b.
 3 * 3    // 9
 1.27 * 4 // 5.08
 -3 * 2   // -6
+----
+
+NOTE: Added in version 0.3
+
+If `a` is a non-negative integer and `b` is a string, or vice versa, `a * b` produces the concatenation of `a` to itself `b` times.
+
+[source,javascript]
+----
+3 * "a" // "aaa"
 ----
 
 === Division

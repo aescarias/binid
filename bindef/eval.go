@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"slices"
 	"strconv"
+	"strings"
 )
 
 func doBinOpEquals(left, right Result) BooleanResult {
@@ -187,6 +188,28 @@ func EvaluateBinOp(node BinOpNode, namespace Namespace) (Result, error) {
 		} else if left.Kind() == ResultInt && right.Kind() == ResultFloat {
 			leftFloat, _ := left.(IntegerResult).Float64()
 			return FloatResult(leftFloat) * right.(FloatResult), nil
+		} else if left.Kind() == ResultString && right.Kind() == ResultInt {
+			count := int(right.(IntegerResult).Int64())
+			if count < 0 {
+				return nil, LangError{
+					ErrorValue,
+					node.Position(),
+					"negative string multiplication",
+				}
+			}
+			repeated := strings.Repeat(string(left.(StringResult)), count)
+			return StringResult(repeated), nil
+		} else if left.Kind() == ResultInt && right.Kind() == ResultString {
+			count := int(left.(IntegerResult).Int64())
+			if count < 0 {
+				return nil, LangError{
+					ErrorValue,
+					node.Position(),
+					"negative string multiplication",
+				}
+			}
+			repeated := strings.Repeat(string(right.(StringResult)), count)
+			return StringResult(repeated), nil
 		}
 
 		return nil, LangError{

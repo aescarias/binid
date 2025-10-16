@@ -465,30 +465,30 @@ func (e ErrMagic) Error() string {
 	return fmt.Sprintf("did not find magic at offset %d", e.Offset)
 }
 
-func checkMagic(handle *os.File, format FormatType) error {
+func checkMagic(handle *os.File, format FormatType) (Result, error) {
 	baseOffset, err := handle.Seek(0, io.SeekCurrent)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, tag := range format.Match {
 		if _, err := handle.Seek(baseOffset+tag.Offset, io.SeekStart); err != nil {
-			return err
+			return nil, err
 		}
 
 		contents := []byte(tag.Contents)
 
 		matchBytes := make([]byte, len(contents))
 		if _, err := handle.Read(matchBytes); err != nil {
-			return err
+			return nil, err
 		}
 
 		if slices.Equal(matchBytes, contents) {
-			return nil
+			return StringResult(contents), nil
 		}
 	}
 
-	return ErrMagic{Offset: baseOffset}
+	return nil, ErrMagic{Offset: baseOffset}
 }
 
 func readInt(handle *os.File, format FormatType) (Result, error) {
@@ -555,11 +555,12 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 	var value Result
 	switch format.Type {
 	case TypeMagic:
-		if err := checkMagic(handle, *format); err != nil {
+		magic, err := checkMagic(handle, *format)
+		if err != nil {
 			return nil, err
 		}
 
-		return nil, nil
+		value = magic
 	case TypeUint8, TypeUint16, TypeUint32, TypeUint64, TypeInt8, TypeInt16, TypeInt32, TypeInt64:
 		num, err := readInt(handle, *format)
 
@@ -676,8 +677,7 @@ func ApplyBDF(document Result, targetFile string) ([]MetaPair, error) {
 
 		value, err := processType(handle, &formatType, ns)
 		if err != nil {
-			var magicErr ErrMagic
-			if errors.Is(err, magicErr) {
+			if err, ok := err.(ErrMagic); ok {
 				return nil, err
 			}
 
