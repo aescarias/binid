@@ -12,7 +12,65 @@ import (
 	"github.com/aescarias/binid/bindef"
 )
 
-var VERSION = "0.3.0"
+var VERSION = "0.4.0"
+
+type CmdArgs struct {
+	Filename string
+	ShowAll  bool
+	ShowHelp bool
+}
+
+func ShowHelp() {
+	fmt.Println("BinID version", VERSION)
+
+	fmt.Println("The Binary Identifier for determining file types")
+	fmt.Println()
+	fmt.Println("usage: binid [-h] [-a] [filename]")
+	fmt.Println()
+	fmt.Println("arguments:")
+	fmt.Println("  filename      path of the file to identify")
+	fmt.Println()
+	fmt.Println("options:")
+	fmt.Println("  -h, --help    show this help message")
+	fmt.Println("  -a, --all     show all bytes of a byte sequence")
+	fmt.Println("                (this may produce large outputs)")
+}
+
+func ParseCmdArgs(args []string) CmdArgs {
+	if len(os.Args) < 2 {
+		fmt.Println("BinID version", VERSION)
+		fmt.Println("usage: binid [-h] [-a] [filename]. see binid -h for help.")
+		os.Exit(1)
+	}
+
+	cmd := CmdArgs{}
+
+	argPosition := 0
+	done := false
+	for argPosition < len(args) && !done {
+		switch arg := args[argPosition]; arg {
+		case "-h", "--help":
+			cmd.ShowHelp = true
+		case "-a", "--all":
+			cmd.ShowAll = true
+		default:
+			if cmd.Filename != "" {
+				done = true
+			} else {
+				cmd.Filename = arg
+			}
+		}
+		argPosition += 1
+	}
+
+	if !cmd.ShowHelp && cmd.Filename == "" {
+		fmt.Println("error: missing required argument 'filename'")
+		fmt.Println("see binid -h for help")
+		os.Exit(1)
+	}
+
+	return cmd
+}
 
 func ParseDef(filepath string) bindef.Result {
 	bdfData, err := os.ReadFile(filepath)
@@ -89,13 +147,14 @@ func GetDefsPaths() (exec string, cwd string, err error) {
 }
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Printf("BinID version %s\n", VERSION)
-		fmt.Printf("usage: binid [filename]\n")
-		os.Exit(1)
+	args := ParseCmdArgs(os.Args[1:])
+
+	if args.ShowHelp {
+		ShowHelp()
+		os.Exit(0)
 	}
 
-	handle, err := os.Open(os.Args[1])
+	handle, err := os.Open(args.Filename)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -126,27 +185,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	inputStat, err := os.Stat(os.Args[1])
+	inputStat, err := os.Stat(args.Filename)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 
 	if inputStat.IsDir() {
-		fmt.Printf("%s is a directory\n", os.Args[1])
+		fmt.Printf("%s is a directory\n", args.Filename)
 		os.Exit(0)
 	}
 
 	if inputStat.Size() <= 0 {
-		fmt.Printf("%s is empty\n", os.Args[1])
+		fmt.Printf("%s is empty\n", args.Filename)
 		os.Exit(0)
 	}
 
-	fmt.Printf("matching %s\n", os.Args[1])
+	fmt.Printf("matching %s\n", args.Filename)
 
 	found := false
 	for defPath, defResult := range defs {
-		match, err := bindef.ApplyBDF(defResult, os.Args[1])
+		match, err := bindef.ApplyBDF(defResult, args.Filename)
 		if err != nil {
 			if _, ok := err.(bindef.ErrMagic); !ok {
 				fmt.Printf("%s:\n  %s\n", defPath, err)
@@ -186,7 +245,7 @@ func main() {
 		}
 
 		for _, pair := range match {
-			bindef.ShowMetadataField(pair, 0)
+			bindef.ShowMetadataField(pair, 0, args.ShowAll)
 		}
 	}
 

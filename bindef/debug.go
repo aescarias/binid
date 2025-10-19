@@ -111,8 +111,10 @@ func ReportError(filepath string, source []byte, err error) {
 }
 
 // ShowMetadataField prints a pair containing a format type and a value with the
-// specified indent level. Spaces are used for indentation.
-func ShowMetadataField(pair MetaPair, indent int) {
+// specified indent level. Spaces are used for indentation. fullBytes determines
+// whether the complete byte sequence is shown. If false, then only the first 256
+// bytes are displayed.
+func ShowMetadataField(pair MetaPair, indent int, fullBytes bool) {
 	indentStr := strings.Repeat("  ", indent)
 
 	var key string
@@ -129,7 +131,16 @@ func ShowMetadataField(pair MetaPair, indent int) {
 	case TypeMagic:
 		return
 	case TypeByte:
-		fmt.Printf("%s%s: %q\n", indentStr, key, pair.Value)
+		str := string(pair.Value.(StringResult))
+
+		const cutoff int = 256
+		if !fullBytes && len(str) > cutoff {
+			str = fmt.Sprintf("%q", str[:cutoff]) + fmt.Sprintf(" (%d bytes remain)", len(str)-cutoff)
+		} else {
+			str = fmt.Sprintf("%q", str)
+		}
+
+		fmt.Printf("%s%s: %s\n", indentStr, key, str)
 	case TypeStruct:
 		mapping := pair.Value.(MapResult)
 
@@ -139,7 +150,17 @@ func ShowMetadataField(pair MetaPair, indent int) {
 
 			ShowMetadataField(
 				MetaPair{Field: field, Value: mapping[id]},
-				indent+1,
+				indent+1, fullBytes,
+			)
+		}
+	case TypeArray:
+		list := pair.Value.(ListResult)
+		fmt.Printf("%s%s (%d):\n", indentStr, key, len(list))
+
+		for _, field := range list {
+			ShowMetadataField(
+				MetaPair{Field: *f.ProcArrItem, Value: field},
+				indent+1, fullBytes,
 			)
 		}
 	default:

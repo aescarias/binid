@@ -83,6 +83,7 @@ const (
 	TypeBool   TypeName = "bool"
 	TypeByte   TypeName = "byte"
 	TypeStruct TypeName = "struct"
+	TypeArray  TypeName = "array"
 	TypeVar    TypeName = "var"
 	TypeUint8  TypeName = "uint8"
 	TypeUint16 TypeName = "uint16"
@@ -97,7 +98,7 @@ const (
 func (tr TypeResult) Kind() ResultKind { return ResultType }
 
 var AvailableTypeNames = []TypeName{
-	TypeMagic, TypeBool, TypeByte, TypeStruct, TypeVar,
+	TypeMagic, TypeBool, TypeByte, TypeStruct, TypeArray, TypeVar,
 	TypeUint8, TypeUint16, TypeUint32, TypeUint64,
 	TypeInt8, TypeInt16, TypeInt32, TypeInt64,
 }
@@ -184,6 +185,38 @@ func GetKeyByIdent[T Result](mapping map[Result]Result, key string, required boo
 	}
 
 	return asserted, nil
+}
+
+// EvalResultIs has the same behavior as [ResultIs], that is, it checks whether
+// a result res is of type T. However, if res is a lazy result, it is first evaluated
+// before checking.
+func EvalResultIs[T Result](res Result, ns Namespace) (T, error) {
+	var zero T
+
+	var evalRes Result
+
+	if res.Kind() == ResultLazy {
+		var err error
+		if evalRes, err = res.(LazyResult)(ns); err != nil {
+			return zero, err
+		}
+	} else {
+		evalRes = res
+	}
+
+	if evalRes.Kind() != zero.Kind() {
+		return zero, fmt.Errorf(
+			"expected result of type %s, received %s", zero.Kind(), res.Kind(),
+		)
+	}
+
+	val, ok := evalRes.(T)
+	if !ok {
+		panic(fmt.Sprintf("type assertion failed for %s (input is %s)", zero.Kind(), evalRes.Kind()))
+	}
+
+	return val, nil
+
 }
 
 // ResultIs validates whether a result res is of type T. If it is, an asserted

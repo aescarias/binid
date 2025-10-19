@@ -63,20 +63,24 @@ type SeekPos struct {
 }
 
 type FormatType struct {
-	Type       TypeName     // Format type (e.g. uint8, int8). May be more complex such as byte[n].
-	Id         string       // Field identifier.
-	Name       string       // Human-readable field name.
-	Doc        string       // Documentation.
-	At         *SeekPos     // Seek position.
-	Valid      LazyResult   // Validation function.
-	If         LazyResult   // Only process value on condition.
-	Endian     string       // For integer types only, the byte endianness (either "big" or "little").
-	Match      []MagicTag   // For magic types only, the pattern(s) that must match.
-	Size       int64        // For byte types only, the size of the byte string.
-	Strip      bool         // For byte types only, whether to strip whitespace or null bytes from the ends of the string.
-	RawFields  []MapResult  // For structures only, the fields contained in the struct.
-	ProcFields []FormatType // For structures only, the fields contained in the struct as format types.
-	VarValue   LazyResult   // For variable definitions, the value contained.
+	Type         TypeName     // Format type (e.g. uint8, int8). May be more complex such as byte[n].
+	Id           string       // Field identifier.
+	Name         string       // Human-readable field name.
+	Doc          string       // Documentation.
+	At           *SeekPos     // Seek position.
+	Valid        LazyResult   // Validation function.
+	If           LazyResult   // Only process value on condition.
+	Endian       string       // For integer types only, the byte endianness (either "big" or "little").
+	Match        []MagicTag   // For magic types only, the pattern(s) that must match.
+	Size         int64        // For byte types only, the size of the byte string.
+	Strip        bool         // For byte types only, whether to strip whitespace or null bytes from the ends of the string.
+	RawFields    []MapResult  // For structures only, the fields contained in the struct.
+	ProcFields   []FormatType // For structures only, the fields contained in the struct as format types.
+	VarValue     LazyResult   // For variable definitions, the value contained.
+	ArrSize      int64        // For array types, the amount of elements in the array.
+	ArrSizeIsEos bool         // For array types, whether the array spans to the end of the sequence.
+	RawArrItem   MapResult    // For array types, the format type as a result.
+	ProcArrItem  *FormatType  // For array types, the format type for each element of the array.
 }
 
 type MagicTag struct {
@@ -238,7 +242,11 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 	var typeRes TypeResult
 	switch genTypeRes.Kind() {
 	case ResultLazy:
-		tempRes, err := genTypeRes.(LazyResult)(ns)
+		typeNs := Namespace{}
+		maps.Copy(typeNs, ns)
+		typeNs[IdentResult("eos")] = IdentResult("eos")
+
+		tempRes, err := genTypeRes.(LazyResult)(typeNs)
 		if err != nil {
 			return FormatType{}, err
 		}
@@ -438,6 +446,50 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 			return FormatType{}, fmt.Errorf("byte size must be numeric")
 		}
 
+		if baseFormat.Size < 0 {
+			return FormatType{}, fmt.Errorf("byte size must be non-negative")
+		}
+
+		return baseFormat, nil
+	case TypeArray:
+		if len(typeRes.Params) <= 0 {
+			return baseFormat, fmt.Errorf("array must specify length")
+		}
+
+		item, err := GetKeyByIdent[MapResult](bin, "item", true)
+		if err != nil {
+			return FormatType{}, err
+		}
+
+		var arrSizeRes Result
+		if tp := typeRes.Params[0]; tp.Kind() == ResultLazy {
+			var err error
+			if arrSizeRes, err = tp.(LazyResult)(ns); err != nil {
+				return FormatType{}, err
+			}
+		} else {
+			arrSizeRes = typeRes.Params[0]
+		}
+
+		if arrSizeRes.Kind() == ResultIdent {
+			if arrSizeRes.(IdentResult) == IdentResult("eos") {
+				baseFormat.ArrSizeIsEos = true
+			} else {
+				return FormatType{}, fmt.Errorf("array size must be numeric")
+			}
+		} else {
+			arrSize, err := ResultIs[IntegerResult](arrSizeRes)
+			if err != nil {
+				return FormatType{}, err
+			}
+
+			baseFormat.ArrSize = arrSize.Int64()
+			if baseFormat.ArrSize < 0 {
+				return FormatType{}, fmt.Errorf("array length must be non-negative")
+			}
+		}
+
+		baseFormat.RawArrItem = item
 		return baseFormat, nil
 	case TypeStruct:
 		fields, err := GetKeyByIdent[ListResult](bin, "fields", true)
@@ -611,6 +663,7 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 
 		inherited := MapResult{IdentResult("endian"): StringResult(format.Endian)}
 
+		format.ProcFields = []FormatType{}
 		for _, field := range format.RawFields {
 			fieldFormat, err := ParseFormatType(field, currentNs, inherited)
 			if err != nil {
@@ -634,6 +687,32 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 		}
 
 		value = mapping
+	case TypeArray:
+		elements := ListResult{}
+
+		idx := int64(0)
+
+		for format.ArrSizeIsEos || idx < format.ArrSize {
+			arrItem, err := ParseFormatType(format.RawArrItem, ns, nil)
+			if err != nil {
+				return nil, err
+			}
+
+			proc, err := processType(handle, &arrItem, ns)
+			if err != nil {
+				if format.ArrSizeIsEos && errors.Is(err, io.EOF) {
+					break
+				}
+				return nil, err
+			}
+
+			format.ProcArrItem = &arrItem
+
+			elements = append(elements, proc)
+			idx += 1
+		}
+
+		value = elements
 	default:
 		return nil, fmt.Errorf("%s is not currently supported", format.Type)
 	}
@@ -680,7 +759,7 @@ func ApplyBDF(document Result, targetFile string) ([]MetaPair, error) {
 		return nil, fmt.Errorf("binary: %w", err)
 	}
 
-	ns := map[Result]Result{}
+	ns := Namespace{}
 
 	for idx, res := range binarySeq {
 		formatType, err := ParseFormatType(res, ns, nil)

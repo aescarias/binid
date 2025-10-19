@@ -651,16 +651,15 @@ func EvaluateSubscript(node SubscriptNode, namespace Namespace) (Result, error) 
 	case ResultMap:
 		value, ok = expr.(MapResult)[item]
 	case ResultType:
-		typeRes := expr.(TypeResult)
-
-		if typeRes.Name == TypeByte {
-			return TypeResult{Name: TypeByte, Params: []Result{item}}, nil
-		}
-
-		return nil, LangError{
-			ErrorType,
-			node.Position(),
-			fmt.Sprintf("type %s does not allow type parameters", typeRes.Name),
+		switch typeRes := expr.(TypeResult); typeRes.Name {
+		case TypeByte, TypeArray:
+			return TypeResult{Name: typeRes.Name, Params: []Result{item}}, nil
+		default:
+			return nil, LangError{
+				ErrorType,
+				node.Position(),
+				fmt.Sprintf("type %s does not allow type parameters", typeRes.Name),
+			}
 		}
 	case ResultList:
 		valueRes := expr.(ListResult)

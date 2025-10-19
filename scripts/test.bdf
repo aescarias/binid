@@ -1,7 +1,7 @@
 {
   meta: {
-    bdf: "0.1",
-    name: "Generic RIFF chunk",
+    bdf: "0.3",
+    name: "RIFF container",
     exts: [],
     mime: []
   },
@@ -9,6 +9,18 @@
     { type: magic, match: "RIFF" },
     { type: uint32,  id: fileSize, endian: "little" },
     { type: byte[4], id: fileType },
-    { type: byte[fileSize], id: chunk}
+    { type: array[eos], 
+      id: chunks,
+      item: {
+        type: struct,
+        endian: "little",
+        name: "Chunk",
+        fields: [
+          { id: ident,  type: byte[4] },
+          { id: length, type: uint32, endian: "little" },
+          { id: data,   type: byte[length] }
+        ]
+      }
+    }
   ]
 }

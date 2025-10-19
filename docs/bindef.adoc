@@ -1,6 +1,6 @@
 = The BinDef Language Reference
 Ángel Carias <lotta.dev@outlook.com>
-v0.3, 2025-10-16
+v0.3, 2025-10-18
 :toc: auto
 :sectnums: |,all|
 
@@ -550,6 +550,7 @@ The currently available types are:
 - The unsigned integer types `uint8`, `uint16`, `uint32`, and `uint64`.
 - The signed integer types `int8`, `int16`, `int32`, and `int64`.
 - The `byte[n]` type.
+- The `array[n]` type.
 - The `struct` type.
 - The variable definition type `var`.
 
@@ -697,7 +698,7 @@ These types must contain an `endian` key specifying either the string "little" o
 
 === The `byte[n]` type
 
-`byte[n]` tells BinDef to read an arbitrary string that is `n` bytes long.
+`byte[n]` tells BinDef to read an arbitrary string that is `n` bytes long. If only a single byte is to be processed, the type parameter `n` may be omitted.
 
 For example, the Extended Module (xm) format used by some https://en.wikipedia.org/wiki/Music_tracker[music trackers] specifies a 20-byte "module name" at offset 17.
 
@@ -786,6 +787,33 @@ NOTE: Added in version 0.3
 The `var` type allows BinDef to define values not contained within the binary sequence. This is useful for performing calculations within the document, for providing additional metadata, or for reading values that are not satisfied by the available format types. 
 
 The `var` type requires an additional field `value` specifying the expression that will be assigned to the variable.
+
+=== The `array[n]` type
+
+NOTE: Added in version 0.3
+
+Most binary formats do not store a single record or element, but rather a collection of them, usually in a sequence starting from a given position. Arrays provide a mechanism for processing a defined amount of elements of the same type within the current binary sequence.
+
+The `array` type requires a type parameter `n` specifying the size of the array. A field using the `array` type requires an additional key `item` specifying the field to be processed `n` times.
+
+If an array is known to extend to the end of the binary sequence, the special identifier `eos` may be specified.
+
+For example, many binary format are conformed of chunks with a type, length, and value, that extend to the end of the file. The following shows how parsing such format can be done:
+
+[source,javascript]
+----
+{ id: chunks,
+  type: array[eos],
+  item: {
+    type: struct, 
+    fields: [
+      { type: byte[4],      id: type },
+      { type: uint32,       id: length, endian: "little" },
+      { type: byte[length], id: value }
+    ]
+  }
+}
+----
 
 == Versioning
 

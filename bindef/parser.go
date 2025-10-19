@@ -153,6 +153,10 @@ func (ps *Parser) tryPostfix(left Node) (Node, error) {
 		switch ps.Cursor().Kind {
 		case TokenLBracket:
 			ps.Advance(1)
+			if ps.Cursor().Kind == TokenRBracket {
+				return nil, LangError{ErrorSyntax, ps.Cursor().Position, "subscript expects at least one parameter"}
+			}
+
 			item, err := ps.Parse()
 			if err != nil {
 				return nil, err
