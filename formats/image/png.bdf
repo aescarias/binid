@@ -1,16 +1,26 @@
 {
   meta: {
-    bdf: "0.1",
+    bdf: "0.3",
     name: "Portable Network Graphics (PNG) image",
     mime: ["image/png"],
     exts: [".png"],
   },
   binary: [
     { type: magic, match: "\x89PNG\r\n\x1a\n" },
-    // no repeat sequence yet for chunk parsing. the structure of a single chunk is: 
-    { type: uint32,       id: length, endian: "big" },
-    { type: byte[4],      id: type },
-    { type: byte[length], id: data },
-    { type: uint32,       id: crc32,  endian: "big" },
+    { type: array[eos], 
+      id: chunks,
+      name: "Chunks",
+      item: {
+        type: struct,
+        name: "Chunk",
+        endian: "big",
+        fields: [
+          { type: uint32,       id: length, name: "Length", endian: "big" },
+          { type: byte[4],      id: type,   name: "Type" },
+          { type: byte[length], id: data,   name: "Data" },
+          { type: uint32,       id: crc32,  name: "CRC32", endian: "big" },
+        ]
+      }
+    }
   ]
 }

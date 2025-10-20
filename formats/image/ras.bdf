@@ -1,0 +1,32 @@
+// BinDef for Sun's Raster bitmap (.ras/.sun)
+// Produced from https://www.fileformat.info/format/sunraster/egff.htm
+
+{
+  meta: {
+    bdf: "0.3",
+    name: "Sun Raster bitmap",
+    mime: ["image/x-sun-raster"], // mime not officially registered
+    exts: [".ras", ".sun"]
+  },
+  binary: [
+    { id: header,
+      type: struct,
+      name: "Header",
+      endian: "big",
+      fields: [
+        { type: magic, match: "Y\xa6j\x95" },
+        { type: uint32, id: width, name: "Width (px)" },
+        { type: uint32, id: height, name: "Height (px)" },
+        { type: uint32, id: depth,  name: "Bits per pixel" },
+        { type: uint32, id: length, name: "Image data (bytes)" },
+        { type: uint32, id: rasterType, name: "Raster type" },
+        { type: uint32, id: colorMap, name: "Color map type" },
+        { type: uint32, id: colorLen, name: "Color map length" }
+      ]
+    },
+    // next follows the image data encoded in whatever scheme is specified by
+    // rasterType and colorMap
+    { id: image, name: "Image data", type: byte[header.length] }
+  ]
+
+}

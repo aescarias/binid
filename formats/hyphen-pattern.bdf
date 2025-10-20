@@ -3,7 +3,7 @@
 
 {
   meta: {
-    bdf: "0.2",
+    bdf: "0.3",
     name: "Google Hyphenation Pattern Binary",
     mime: [],
     exts: [".hyb"],
@@ -63,13 +63,16 @@
       endian: "little",
       at: header.patternOffset,
       fields: [
-        { type: uint32,        id: version,       name: "Version" },
-        { type: uint32,        id: count,         name: "Count" },
-        { type: uint32,        id: patternOffset, name: "Pattern offset" },
-        { type: uint32,        id: patternSize,   name: "Pattern size (bytes)" },
-        // TODO: add support for list types
-        // { type: uint32[count], id: _entries },
-        // { type: byte[patternSize], id: _pattern_buf }
+        { type: uint32, id: version,       name: "Version" },
+        { type: uint32, id: count,         name: "Count" },
+        { type: uint32, id: patternOffset, name: "Pattern offset" },
+        { type: uint32, id: patternSize,   name: "Pattern size (bytes)" },
+        { type: array[count],
+          id: entries,
+          name: "Entries",
+          item: { type: uint32, id: entry, name: "Value", endian: "little" }
+        },
+        { type: byte[patternSize], id: patternBuf, name: "Pattern buffer" }
       ]
     }
   ]

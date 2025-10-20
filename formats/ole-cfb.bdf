@@ -3,7 +3,7 @@
 
 {
   meta: {
-    bdf: "0.1",
+    bdf: "0.3",
     name: "Compound File Binary Format",
     mime: ["application/x-ole-storage"],
     exts: [],

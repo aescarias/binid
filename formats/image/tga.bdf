@@ -1,0 +1,146 @@
+// BinDef for the TrueVision TGA / Targa raster format
+// Produced from https://en.wikipedia.org/wiki/Truevision_TGA 
+//               https://www.ludorg.net/amnesia/TGA_File_Format_Spec.html
+
+{
+  meta: {
+    bdf: "0.1",
+    name: "Truevision TGA image",
+    exts: [".tga"],
+    mime: ["image/x-targa", "image/x-tga"] 
+  },
+  binary: [
+    { id: _targaType, type: magic, at: 3, 
+      match: ["\x00", "\x01", "\x02", "\x03", "\x09", "\x0a", "\x0b", "\x20", "\x21"] 
+    },
+    { id: _targaV2Sig, type: byte[18], at: [-18, "end"] },
+    { type: var, id: version, name: "Version", 
+      value: _targaV2Sig == "TRUEVISION-XFILE.\x00" ? 2 : 1
+    },
+    { at: 0,
+      id: header,
+      type: struct,
+      name: "Image header",
+      endian: "little",
+      fields: [
+        { type: uint8, id: idFieldLen,    name: "Id. field length" },
+        { type: uint8, id: colorMapType,  name: "Color map type" },
+        { type: uint8, id: imageTypeCode, name: "Image type code" },
+        { type: struct, 
+          id: colorMapSpec,
+          name: "Color map specification",
+          endian: "little",
+          fields: [
+            { type: uint16, id: colorMapOrigin,    name: "Color map origin" },
+            { type: uint16, id: colorMapLength,    name: "Color map length" },
+            { type: uint8,  id: colorMapEntrySize, name: "Color map entry size" },
+          ]
+        },
+        { type: struct,
+          id: imageSpec,
+          name: "Image specification",
+          endian: "little",
+          fields: [
+            { type: uint16, id: xOrigin, name: "X origin" },
+            { type: uint16, id: yOrigin, name: "Y origin" },
+            { type: uint16, id: width,   name: "Width (px)" },
+            { type: uint16, id: height,  name: "Height (px)" },
+            { type: uint8,  id: bpp,     name: "Bits per pixel" },
+            { type: uint8,  id: imDesc,  name: "Image descriptor byte" }
+          ]
+        },
+        { type: byte[idFieldLen], id: idField, name: "Identification field" }
+      ]
+    },
+    { if: version == 2, 
+      at: [-26, "end"],
+      id: extHeader,
+      name: "Extensions",
+      type: struct,
+      endian: "little",
+      fields: [
+        { type: uint32, id: extOffset,     name: "Extension offset (bytes)" },
+        { type: uint32, id: devAreaOffset, name: "Developer area offset (bytes)" }
+      ]
+    },
+    { if: version == 2 && extHeader.extOffset != 0,
+      id: extArea,
+      at: extHeader.extOffset,
+      name: "Extension area",
+      type: struct,
+      endian: "little",
+      fields: [
+        { type: uint16,    id: extSize,         name: "Extension size" },
+        { type: byte[41],  id: authorName,      name: "Author name", strip: true },
+        { type: byte[324], id: authorComment,   name: "Author comment", strip: true },
+        { type: struct,  
+          id: timestamp,       
+          name: "Timestamp",
+          endian: "little",
+          fields: [
+            { type: uint16, id: month,  name: "Month" },
+            { type: uint16, id: day,    name: "Day" },
+            { type: uint16, id: year,   name: "Year" },
+            { type: uint16, id: hour,   name: "Hour" },
+            { type: uint16, id: minute, name: "Minute" },
+            { type: uint16, id: second, name: "Second" }
+          ]
+        },
+        { type: byte[41],  id: jobID,           name: "Job ID" },
+        { type: struct,   
+          id: jobTime,         
+          name: "Job elapsed time",
+          endian: "little",
+          fields: [
+            { type: uint16, id: hour,   name: "Hour" },
+            { type: uint16, id: minute, name: "Minute" },
+            { type: uint16, id: second, name: "Second" }            
+          ]
+        },
+        { type: byte[41],  id: softwareId,      name: "Software ID" },
+        { type: struct,   
+          id: softwareVersion, 
+          name: "Software version", 
+          endian: "little",
+          fields: [
+            { type: uint16, id: number, name: "Number" },
+            { type: byte,   id: letter, name: "Letter" }
+          ]
+        },
+        { type: struct,
+          id: keyColor,
+          name: "Key color",
+          endian: "little",
+          fields: [ 
+            { type: uint8, id: red,   name: "Red" },
+            { type: uint8, id: green, name: "Green" },
+            { type: uint8, id: blue,  name: "Blue" },
+            { type: uint8, id: alpha, name: "Alpha" }
+          ]
+        },
+        { type: struct,
+          id: pixelAspectRatio,
+          name: "Pixel aspect ratio",
+          endian: "little",
+          fields: [
+            { type: uint16, id: numerator,   name: "Numerator" },
+            { type: uint16, id: denominator, name: "Denominator" }
+          ]
+        },
+        { type: struct,
+          id: gammaValue,
+          name: "Gamma value",
+          endian: "little",
+          fields: [
+            { type: uint16, id: numerator,   name: "Numerator" },
+            { type: uint16, id: denominator, name: "Denominator" }
+          ]
+        },
+        { type: uint32, id: colorCorrectionOffset, name: "Color correction offset" },
+        { type: uint32, id: postageStampOffset,    name: "Postage stamp offset" },
+        { type: uint32, id: scanLineOffset,        name: "Scan line offset" },
+        { type: uint8,  id: attributesType,        name: "Attributes type" },
+      ]
+    }
+  ]
+}

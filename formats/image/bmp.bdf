@@ -1,16 +1,41 @@
 {
   meta: {
-    bdf: "0.1",
+    bdf: "0.3",
     name: "Windows Bitmap file",
     mime: ["image/bmp", "image/x-bmp"],
-    exts: [".bmp"],
+    exts: [".bmp", ".dib"],
   },
   binary: [
-    // bm header 
-    { type: magic, match: "BM" },
-    { id: size,         type: uint32, endian: "little" },
-    { id: _appDefined1, type: uint16, endian: "little" },
-    { id: _appDefined2, type: uint16, endian: "little" },
-    { id: imageOffset,  type: uint32, endian: "little" },
+    { id: bmHeader, 
+      type: struct,
+      name: "Bitmap header",
+      endian: "little",
+      fields: [
+        { type: magic, match: "BM" },
+        { id: size,         type: uint32, name: "File size (bytes)" },
+        { id: _appDefined1, type: uint16 },
+        { id: _appDefined2, type: uint16 },
+        { id: imageOffset,  type: uint32, name: "Image offset" },
+      ]
+    },
+    { type: uint32, id: dibHeaderSize, name: "Bitmap header size", endian: "little" },
+    { if: dibHeaderSize == 40, // BITMAPINFOHEADER
+      id: bitmapInfoHeader,
+      type: struct,
+      name: "Bitmap info header",
+      endian: "little",
+      fields: [
+        { id: width,          type: int32,  name: "Width (px)" },
+        { id: height,         type: int32,  name: "Height (px)" },
+        { id: planes,         type: uint16, name: "Color planes", valid: planes == 1 },
+        { id: bpp,            type: uint16, name: "Bits per pixel" },
+        { id: compressMethod, type: uint32, name: "Compression method" },
+        { id: imageSize,      type: uint32, name: "Image size" },
+        { id: htRes,          type: int32,  name: "Horizontal resolution (px per meter)" },
+        { id: vtRes,          type: int32,  name: "Vertical resolution (px per meter)" },
+        { id: colors,         type: uint32, name: "Colors in palette" },
+        { id: impColors,      type: uint32, name: "Important colors in palette" }
+      ]
+    }
   ]
 }
