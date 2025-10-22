@@ -10,7 +10,7 @@ BinID can be useful for finding software that can read a particular file, perfor
 
 For Windows users, you can download a built copy of BinID from the [Releases](https://github.com/aescarias/binid/releases) page. For other platforms, you will have to download the [Go](https://go.dev/) runtime, clone the project using `git clone`, and run `go build -o binid .\cmd` in the root directory to get a BinID executable for your platform.
 
-You must also download the definitions folder to be able to use BinID. For now, we recommend that you `git clone` the repository or download the repository as a ZIP and extract the `formats` folder from it. In the future, a ready-to-go compressed archive will be provided for convenience.
+BinID hosts its definition in the [BinID Formats](https://github.com/aescarias/binid-formats]) repository. You must download these definitions to use them with BinID. For now, we recommend that you either `git clone` the repository into a `formats` folder or download the repository as a ZIP and extract the contents into a `formats` folder. In the future, a ready-to-go compressed archive will be provided for convenience.
 
 ## Usage
 
