@@ -87,10 +87,12 @@ const (
 	TypeVar    TypeName = "var"
 	TypeUint8  TypeName = "uint8"
 	TypeUint16 TypeName = "uint16"
+	TypeUint24 TypeName = "uint24"
 	TypeUint32 TypeName = "uint32"
 	TypeUint64 TypeName = "uint64"
 	TypeInt8   TypeName = "int8"
 	TypeInt16  TypeName = "int16"
+	TypeInt24  TypeName = "int24"
 	TypeInt32  TypeName = "int32"
 	TypeInt64  TypeName = "int64"
 )
@@ -99,8 +101,8 @@ func (tr TypeResult) Kind() ResultKind { return ResultType }
 
 var AvailableTypeNames = []TypeName{
 	TypeMagic, TypeBool, TypeByte, TypeStruct, TypeArray, TypeVar,
-	TypeUint8, TypeUint16, TypeUint32, TypeUint64,
-	TypeInt8, TypeInt16, TypeInt32, TypeInt64,
+	TypeUint8, TypeUint16, TypeUint24, TypeUint32, TypeUint64,
+	TypeInt8, TypeInt16, TypeInt24, TypeInt32, TypeInt64,
 }
 
 // GetEvalKeyByIdent pipes its arguments to [GetKeyByIdent] and returns its result but

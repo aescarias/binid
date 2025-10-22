@@ -394,7 +394,7 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 			}
 			return baseFormat, nil
 		}
-	case TypeUint16, TypeUint32, TypeUint64, TypeInt16, TypeInt32, TypeInt64:
+	case TypeUint16, TypeUint24, TypeUint32, TypeUint64, TypeInt16, TypeInt24, TypeInt32, TypeInt64:
 		endian, err := getFormatEndian(bin, base, ns)
 		if err != nil {
 			return FormatType{}, err
@@ -559,6 +559,8 @@ func readInt(handle *os.File, format FormatType) (Result, error) {
 		numBytes = 1
 	case TypeUint16, TypeInt16:
 		numBytes = 2
+	case TypeUint24, TypeInt24:
+		numBytes = 3
 	case TypeUint32, TypeInt32:
 		numBytes = 4
 	case TypeUint64, TypeInt64:
@@ -582,6 +584,9 @@ func readInt(handle *os.File, format FormatType) (Result, error) {
 		switch format.Type {
 		case TypeUint16, TypeInt16:
 			return IntegerResult{big.NewInt(int64(binary.LittleEndian.Uint16(bytesToRead)))}, nil
+		case TypeUint24, TypeInt24:
+			value := int64(bytesToRead[0]) | int64(bytesToRead[1])<<8 | int64(bytesToRead[2])<<16
+			return IntegerResult{big.NewInt(int64(value))}, nil
 		case TypeUint32, TypeInt32:
 			return IntegerResult{big.NewInt(int64(binary.LittleEndian.Uint32(bytesToRead)))}, nil
 		case TypeUint64, TypeInt64:
@@ -591,6 +596,9 @@ func readInt(handle *os.File, format FormatType) (Result, error) {
 		switch format.Type {
 		case TypeUint16, TypeInt16:
 			return IntegerResult{big.NewInt(int64(binary.BigEndian.Uint16(bytesToRead)))}, nil
+		case TypeUint24, TypeInt24:
+			value := int64(bytesToRead[2]) | int64(bytesToRead[1])<<8 | int64(bytesToRead[0])<<16
+			return IntegerResult{big.NewInt(int64(value))}, nil
 		case TypeUint32, TypeInt32:
 			return IntegerResult{big.NewInt(int64(binary.BigEndian.Uint32(bytesToRead)))}, nil
 		case TypeUint64, TypeInt64:
@@ -622,7 +630,7 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 		}
 
 		value = magic
-	case TypeUint8, TypeUint16, TypeUint32, TypeUint64, TypeInt8, TypeInt16, TypeInt32, TypeInt64:
+	case TypeUint8, TypeUint16, TypeUint24, TypeUint32, TypeUint64, TypeInt8, TypeInt16, TypeInt24, TypeInt32, TypeInt64:
 		num, err := readInt(handle, *format)
 
 		if err != nil {
