@@ -81,6 +81,14 @@ type FormatType struct {
 	ArrSizeIsEos bool         // For array types, whether the array spans to the end of the sequence.
 	RawArrItem   MapResult    // For array types, the format type as a result.
 	ProcArrItem  *FormatType  // For array types, the format type for each element of the array.
+	EnumType     TypeName     // For enum types, the underlying type of the enumeration.
+	EnumMembers  []EnumMember // For enum types, the members of the enumeration.
+}
+
+type EnumMember struct {
+	Id    string // The enum constant identifier.
+	Value Result // The value of the enum constant.
+	Doc   string // Details about the enum constant.
 }
 
 type MagicTag struct {
@@ -203,6 +211,44 @@ func getFormatEndian(bin MapResult, base MapResult, ns Namespace) (string, error
 	}
 
 	return endian, nil
+}
+
+func IntegerInBounds(bound TypeName, value IntegerResult) bool {
+	bigUint := func(value uint64) *big.Int {
+		return new(big.Int).SetUint64(value)
+	}
+	bigInt := func(value int64) *big.Int {
+		return new(big.Int).SetInt64(value)
+	}
+
+	intValue := value.Int
+
+	var minBound, maxBound *big.Int
+
+	switch bound {
+	case TypeUint8:
+		minBound, maxBound = bigUint(0), bigUint(0xff)
+	case TypeUint16:
+		minBound, maxBound = bigUint(0), bigUint(0xffff)
+	case TypeUint24:
+		minBound, maxBound = bigUint(0), bigUint(0xffffff)
+	case TypeUint32:
+		minBound, maxBound = bigUint(0), bigUint(math.MaxUint32)
+	case TypeUint64:
+		minBound, maxBound = bigUint(0), bigUint(math.MaxUint64)
+	case TypeInt8:
+		minBound, maxBound = bigInt(math.MinInt8), bigInt(math.MaxInt8)
+	case TypeInt16:
+		minBound, maxBound = bigInt(math.MinInt16), bigInt(math.MaxInt16)
+	case TypeInt24:
+		minBound, maxBound = bigInt(-8_388_608), bigInt(8_388_607)
+	case TypeInt32:
+		minBound, maxBound = bigInt(math.MinInt32), bigInt(math.MaxInt32)
+	case TypeInt64:
+		minBound, maxBound = bigInt(math.MinInt64), bigInt(math.MaxInt64)
+	}
+
+	return intValue.Cmp(minBound) >= 0 && intValue.Cmp(maxBound) <= 0
 }
 
 var ErrSkipped = fmt.Errorf("format type was skipped because condition is false")
@@ -473,7 +519,7 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 		return baseFormat, nil
 	case TypeArray:
 		if len(typeRes.Params) <= 0 {
-			return baseFormat, fmt.Errorf("array must specify length")
+			return FormatType{}, fmt.Errorf("array must specify length")
 		}
 
 		item, err := GetKeyByIdent[MapResult](bin, "item", true)
@@ -532,6 +578,67 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 		}
 
 		baseFormat.Endian = endian
+		return baseFormat, nil
+	case TypeEnum:
+		if len(typeRes.Params) <= 0 {
+			return FormatType{}, fmt.Errorf("enum must specify underlying type")
+		}
+
+		enumType, err := EvalResultIs[TypeResult](typeRes.Params[0], ns)
+		if err != nil {
+			return FormatType{}, err
+		}
+
+		if !slices.Contains(AvailableIntegerTypes, enumType.Name) {
+			return FormatType{}, fmt.Errorf("enum only supports integer types")
+		}
+
+		members, err := GetKeyByIdent[ListResult](bin, "members", true)
+		if err != nil {
+			return FormatType{}, err
+		}
+
+		if enumType.Name != TypeUint8 && enumType.Name != TypeInt8 {
+			endian, err := getFormatEndian(bin, base, ns)
+			if err != nil {
+				return FormatType{}, err
+			}
+			baseFormat.Endian = endian
+		}
+
+		for _, field := range members {
+			element, err := ResultIs[MapResult](field)
+			if err != nil {
+				return FormatType{}, err
+			}
+
+			ident, err := GetEvalKeyByIdent[IdentResult](element, "id", true, nil)
+			if err != nil {
+				return FormatType{}, err
+			}
+
+			value, err := GetEvalKeyByIdent[Result](element, "value", true, nil)
+			if err != nil {
+				return FormatType{}, err
+			}
+
+			doc, err := GetKeyByIdent[StringResult](element, "doc", false)
+			if err != nil {
+				return FormatType{}, err
+			}
+
+			if intRes, ok := value.(IntegerResult); ok && !IntegerInBounds(enumType.Name, intRes) {
+				return FormatType{}, fmt.Errorf("enum value %q not in bounds of assigned integer type %s", ident, enumType.Name)
+			}
+
+			baseFormat.EnumMembers = append(baseFormat.EnumMembers, EnumMember{
+				Id:    string(ident),
+				Value: value,
+				Doc:   string(doc),
+			})
+		}
+
+		baseFormat.EnumType = enumType.Name
 		return baseFormat, nil
 	}
 
@@ -680,6 +787,26 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 		} else {
 			value = StringResult(byteSlice)
 		}
+	case TypeEnum:
+		result, err := processType(handle, &FormatType{Type: format.EnumType, Endian: format.Endian}, ns)
+		if err != nil {
+			return nil, err
+		}
+
+		isEnumerated := false
+		for _, member := range format.EnumMembers {
+			ns[IdentResult(member.Id)] = member.Value
+
+			if doBinOpEquals(result, member.Value) {
+				isEnumerated = true
+			}
+		}
+
+		if !isEnumerated {
+			return nil, fmt.Errorf("value %d not part of enumeration", result)
+		}
+
+		value = result
 	case TypeStruct:
 		mapping := MapResult{}
 

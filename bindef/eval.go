@@ -652,7 +652,7 @@ func EvaluateSubscript(node SubscriptNode, namespace Namespace) (Result, error) 
 		value, ok = expr.(MapResult)[item]
 	case ResultType:
 		switch typeRes := expr.(TypeResult); typeRes.Name {
-		case TypeByte, TypeArray:
+		case TypeByte, TypeArray, TypeEnum:
 			return TypeResult{Name: typeRes.Name, Params: []Result{item}}, nil
 		default:
 			return nil, LangError{

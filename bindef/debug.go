@@ -163,6 +163,19 @@ func ShowMetadataField(pair MetaPair, indent int, fullBytes bool) {
 				indent+1, fullBytes,
 			)
 		}
+	case TypeEnum:
+		var friendlyName string
+		for _, member := range f.EnumMembers {
+			if doBinOpEquals(member.Value, pair.Value) {
+				if member.Doc != "" {
+					friendlyName = member.Doc
+				} else {
+					friendlyName = member.Id
+				}
+				break
+			}
+		}
+		fmt.Printf("%s%s: %s (%#x)\n", indentStr, key, friendlyName, pair.Value)
 	default:
 		fmt.Printf("%s%s: %v\n", indentStr, key, pair.Value)
 	}

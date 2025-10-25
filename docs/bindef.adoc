@@ -559,6 +559,7 @@ The currently available types are:
 - The `array[n]` type.
 - The `struct` type.
 - The variable definition type `var`.
+- The enumeration type `enum`.
 
 Other format types may be defined by including them in the `types` key of the mapping.
 
@@ -830,6 +831,37 @@ For example, many binary format are conformed of chunks with a type, length, and
   }
 }
 ----
+
+=== The `enum` type
+
+NOTE: Added in version 0.4
+
+Enumerations provide a mechanism for defining an integer field that is expected to be a known set of values. The `enum` type takes a single type parameter describing the underlying integer type of the field.
+
+The `enum` type requires an additional key `members` which is a list of mappings described the constant values part of the enumeration.
+
+Each enumeration member is a mapping that must contain the keys `ìd` and `value`. `id` is an identifier that will be used to refer to the constant value and `value` specifies the constant value itself. An optional field `doc` may also be used to specify a human-readable name for the enum constant.
+
+For example, the Executable and Linkable Format includes multiple integer fields that may be described as enumerations. In this case, we will describe the values of the `e_ident[E_OSABI]` field as shown below.
+
+[source,javascript]
+----
+{
+  type: enum[uint8],
+  id: targetABI,
+  name: "Target ABI",
+  members: [
+    { id: SYSTEM_V, value: 0x00, doc: "System V" },
+    { id: HP_UX,    value: 0x01, doc: "HP-UX" },
+    { id: NETBSD,   value: 0x02, doc: "NetBSD" },
+    { id: LINUX,    value: 0x03, doc: "Linux" },
+    { id: GNU_HURD, value: 0x04, doc: "GNU Hurd" },
+    // etc.
+  ]
+}
+----
+
+An error must be raised if the specified enum value is outside of the range of the underlying type. An error must also be raised if the processed value (the one read from the binary stream) is not part of the enumeration.
 
 === Type definitions
 

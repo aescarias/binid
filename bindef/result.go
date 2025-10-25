@@ -85,6 +85,7 @@ const (
 	TypeStruct TypeName = "struct"
 	TypeArray  TypeName = "array"
 	TypeVar    TypeName = "var"
+	TypeEnum   TypeName = "enum"
 	TypeUint8  TypeName = "uint8"
 	TypeUint16 TypeName = "uint16"
 	TypeUint24 TypeName = "uint24"
@@ -100,7 +101,12 @@ const (
 func (tr TypeResult) Kind() ResultKind { return ResultType }
 
 var AvailableTypeNames = []TypeName{
-	TypeMagic, TypeBool, TypeByte, TypeStruct, TypeArray, TypeVar,
+	TypeMagic, TypeBool, TypeByte, TypeStruct, TypeArray, TypeVar, TypeEnum,
+	TypeUint8, TypeUint16, TypeUint24, TypeUint32, TypeUint64,
+	TypeInt8, TypeInt16, TypeInt24, TypeInt32, TypeInt64,
+}
+
+var AvailableIntegerTypes = []TypeName{
 	TypeUint8, TypeUint16, TypeUint24, TypeUint32, TypeUint64,
 	TypeInt8, TypeInt16, TypeInt24, TypeInt32, TypeInt64,
 }
