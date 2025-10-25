@@ -69,7 +69,7 @@ func ParseCmdArgs(args []string) CmdArgs {
 		argPosition += 1
 	}
 
-	if !cmd.ShowHelp && cmd.Filename == "" {
+	if !(cmd.ShowHelp || cmd.ShowVersion) && cmd.Filename == "" {
 		fmt.Println("error: missing required argument 'filename'")
 		fmt.Println("see binid -h for help")
 		os.Exit(1)

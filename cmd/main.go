@@ -118,6 +118,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	if args.ShowVersion {
+		fmt.Println("BinID version", VERSION)
+		os.Exit(0)
+	}
+
 	handle, err := os.Open(args.Filename)
 	if err != nil {
 		fmt.Println(err)
