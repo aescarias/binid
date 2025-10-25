@@ -1,6 +1,6 @@
 = The BinDef Language Reference
 Ángel Carias <lotta.dev@outlook.com>
-v0.4, 2025-10-21
+v0.4, 2025-10-25
 :toc: auto
 :sectnums: |,all|
 
@@ -507,7 +507,13 @@ A BinDef document contains a single mapping describing the binary definition. It
 
 For all BinDef defined mappings, it is required that the keys are identifiers.
 
-The single mapping in the document contains two keys `meta` and `binary`. `meta` contains metadata or details of the format being described. `binary` contains the structured description of the format.
+The single mapping in the document may contain three keys: `meta`, `binary`, and `types`.
+
+- `meta` (required) is a mapping contains metadata or details of the format being described. 
+- `binary` (required) is a list of mappings containing the structured description of the format.
+- `types` (optional) is a list of mappings containing *format types* that may be used anywhere within `binary`.
+
+NOTE: The `types` key was added in version 0.4
 
 === The `meta` key
 
@@ -554,11 +560,17 @@ The currently available types are:
 - The `struct` type.
 - The variable definition type `var`.
 
+Other format types may be defined by including them in the `types` key of the mapping.
+
 If a BinDef processor finds a type that it doesn't recognize, it shall stop parsing the document and issue a warning.
+
+=== The `types` key
+
+`types` is an optional list of mappings describing format types used as type definitions within a BinDef document. The structure of type definitions is discussed in <<Format types>> and <<Type definitions>>.
 
 == Format types
 
-All format types share the following keys:
+A format type is a mapping describing a field within a structured format such as an integer or a byte sequence. All format types share the following keys:
 
 [cols="1,1,2"]
 |====
@@ -593,9 +605,11 @@ All format types share the following keys:
 |(optional) A condition for parsing the field. If the condition is met, the field will be parsed; otherwise, it will be skipped.
 |====
 
+NOTE: For BinDef version 0.4 and later, additional considerations apply for format types that appear as type definitions. See <<Type definitions>> for details.
+
 All format types must have a `type` key with an identifier for the format type being used. This also determines whether additional keys may be specified.
 
-The `id` key may contain a name used to identify the value being described. An identifier starting with `_` is considered private and will not appear in the extracted output. If the contents of the field are not relevant (such as with padding or reserved values), the `id` key may be skipped. 
+The `id` key may contain a name used to identify the value being described. An identifier starting with `_` is considered private and will not appear in the extracted output. If the contents of the field are not relevant (such as with padding or reserved values), the `id` key may be skipped.
 
 The `name` and `doc` keys provide optional documentation for a field. The `name` key is a string intended as a human-readable name of the field. The `doc` key is designed to provide additional information on the purpose of the field or possible values.
 
@@ -816,6 +830,14 @@ For example, many binary format are conformed of chunks with a type, length, and
   }
 }
 ----
+
+=== Type definitions
+
+NOTE: Added in version 0.4
+
+Type definitions allow BinDef authors to separate type structures from the `binary` key making the binary sequence more concise. Type definitions must appear in a separate `types` key within the root of the document.
+
+The structure of a type definition is the same as a format type. However, in type definitions, the `id` key is required as it will be used as the identifier to refer to this type. It is recommended that the keys `at`, `valid`, and `if` do not appear in the root format type.
 
 == Versioning
 

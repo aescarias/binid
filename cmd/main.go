@@ -12,65 +12,7 @@ import (
 	"github.com/aescarias/binid/bindef"
 )
 
-var VERSION = "0.4.0"
-
-type CmdArgs struct {
-	Filename string
-	ShowAll  bool
-	ShowHelp bool
-}
-
-func ShowHelp() {
-	fmt.Println("BinID version", VERSION)
-
-	fmt.Println("The Binary Identifier for determining file types")
-	fmt.Println()
-	fmt.Println("usage: binid [-h] [-a] [filename]")
-	fmt.Println()
-	fmt.Println("arguments:")
-	fmt.Println("  filename      path of the file to identify")
-	fmt.Println()
-	fmt.Println("options:")
-	fmt.Println("  -h, --help    show this help message")
-	fmt.Println("  -a, --all     show all bytes of a byte sequence")
-	fmt.Println("                (this may produce large outputs)")
-}
-
-func ParseCmdArgs(args []string) CmdArgs {
-	if len(os.Args) < 2 {
-		fmt.Println("BinID version", VERSION)
-		fmt.Println("usage: binid [-h] [-a] [filename]. see binid -h for help.")
-		os.Exit(1)
-	}
-
-	cmd := CmdArgs{}
-
-	argPosition := 0
-	done := false
-	for argPosition < len(args) && !done {
-		switch arg := args[argPosition]; arg {
-		case "-h", "--help":
-			cmd.ShowHelp = true
-		case "-a", "--all":
-			cmd.ShowAll = true
-		default:
-			if cmd.Filename != "" {
-				done = true
-			} else {
-				cmd.Filename = arg
-			}
-		}
-		argPosition += 1
-	}
-
-	if !cmd.ShowHelp && cmd.Filename == "" {
-		fmt.Println("error: missing required argument 'filename'")
-		fmt.Println("see binid -h for help")
-		os.Exit(1)
-	}
-
-	return cmd
-}
+var VERSION = "0.5.0"
 
 func ParseDef(filepath string) bindef.Result {
 	bdfData, err := os.ReadFile(filepath)
@@ -130,7 +72,7 @@ func GetDefs(path string) (map[string]bindef.Result, error) {
 	return defs, nil
 }
 
-func GetDefsPaths() (exec string, cwd string, err error) {
+func GetDefaultDefsPaths() (exec string, cwd string, err error) {
 	exe, err := os.Executable()
 	if err != nil {
 		return "", "", err
@@ -144,6 +86,28 @@ func GetDefsPaths() (exec string, cwd string, err error) {
 	return filepath.Join(filepath.Dir(exe), "formats"),
 		filepath.Join(wd, "formats"),
 		nil
+}
+
+type ErrLookupFailed struct {
+	Issues map[string]error
+}
+
+func (e ErrLookupFailed) Error() string {
+	return fmt.Sprintf("failed to load definitions from %d location(s)", len(e.Issues))
+}
+
+func LoadDefs(paths []string) (map[string]bindef.Result, error) {
+	lookupErrors := map[string]error{}
+	for _, path := range paths {
+		defs, err := GetDefs(path)
+		if err != nil {
+			lookupErrors[path] = err
+			continue
+		}
+		return defs, nil
+	}
+
+	return nil, ErrLookupFailed{Issues: lookupErrors}
 }
 
 func main() {
@@ -161,23 +125,31 @@ func main() {
 	}
 	defer handle.Close()
 
-	exePath, cwdPath, err := GetDefsPaths()
-	if err != nil {
-		fmt.Printf("failed definition lookup: %s\n", err)
-		os.Exit(1)
-	}
-
-	var defs map[string]bindef.Result
-	if defs, err = GetDefs(exePath); err != nil {
-		if defs, err = GetDefs(cwdPath); err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				fmt.Printf("'formats' definition folder missing. looked in:\n  %s\n  %s\n", exePath, cwdPath)
-			} else {
-				fmt.Printf("failed to load definitions:\n%s\n", err)
-			}
-
+	var lookupPaths []string
+	if args.DefsPath != "" {
+		lookupPaths = []string{args.DefsPath}
+	} else {
+		exePath, cwdPath, err := GetDefaultDefsPaths()
+		if err != nil {
+			fmt.Printf("failed definition lookup: %s\n", err)
 			os.Exit(1)
 		}
+		lookupPaths = []string{exePath, cwdPath}
+	}
+
+	defs, err := LoadDefs(lookupPaths)
+	if err != nil {
+		if lerr, ok := err.(ErrLookupFailed); ok {
+			fmt.Println(lerr)
+			for path, err := range lerr.Issues {
+				if errors.Is(err, fs.ErrNotExist) {
+					fmt.Printf("%s:\n  the path does not exist\n", path)
+				} else {
+					fmt.Printf("%s:\n  %s\n", path, err)
+				}
+			}
+		}
+		os.Exit(1)
 	}
 
 	fmt.Printf("found %d definition(s)\n", len(defs))
@@ -204,18 +176,20 @@ func main() {
 	fmt.Printf("matching %s\n", args.Filename)
 
 	found := false
+	failedMatches := map[string]error{}
+
 	for defPath, defResult := range defs {
 		match, err := bindef.ApplyBDF(defResult, args.Filename)
 		if err != nil {
 			if _, ok := err.(bindef.ErrMagic); !ok {
-				fmt.Printf("%s:\n  %s\n", defPath, err)
+				failedMatches[defPath] = err
 			}
 			continue
 		}
 
 		meta, err := bindef.GetMetadata(defResult)
 		if err != nil {
-			fmt.Printf("format %q matched but metadata get failed with %q\n", defPath, err)
+			failedMatches[defPath] = fmt.Errorf("metadata get failed: %w", err)
 			continue
 		}
 
@@ -246,6 +220,13 @@ func main() {
 
 		for _, pair := range match {
 			bindef.ShowMetadataField(pair, 0, args.ShowAll)
+		}
+	}
+
+	if len(failedMatches) > 0 {
+		fmt.Println("\n== errors")
+		for defPath, err := range failedMatches {
+			fmt.Printf("%s:\n  %s\n", defPath, err)
 		}
 	}
 

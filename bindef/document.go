@@ -239,6 +239,7 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 		return FormatType{}, err
 	}
 
+	var inherited *FormatType
 	var typeRes TypeResult
 	switch genTypeRes.Kind() {
 	case ResultLazy:
@@ -251,9 +252,20 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 			return FormatType{}, err
 		}
 
-		typeRes, err = ResultIs[TypeResult](tempRes)
-		if err != nil {
-			return FormatType{}, err
+		switch tempRes.Kind() {
+		case ResultMap:
+			tempInherited, err := ParseFormatType(tempRes, ns, nil)
+			if err != nil {
+				return FormatType{}, err
+			}
+
+			inherited = &tempInherited
+		case ResultType:
+			if typeRes, err = ResultIs[TypeResult](tempRes); err != nil {
+				return FormatType{}, err
+			}
+		default:
+			return FormatType{}, fmt.Errorf("%s is not a valid type provider", tempRes.Kind())
 		}
 	case ResultType:
 		typeRes = genTypeRes.(TypeResult)
@@ -354,17 +366,25 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 		return FormatType{}, err
 	}
 
-	baseFormat := FormatType{
-		Type:  typeRes.Name,
-		Id:    string(idRes),
-		Name:  string(nameRes),
-		Doc:   string(docRes),
-		At:    atVal,
-		If:    ifRes,
-		Valid: validRes,
+	var baseFormat FormatType
+	if inherited != nil {
+		baseFormat = FormatType(*inherited)
+	} else {
+		baseFormat.Type = typeRes.Name
 	}
 
-	switch typeRes.Name {
+	baseFormat.Id = string(idRes)
+	baseFormat.Name = string(nameRes)
+	baseFormat.Doc = string(docRes)
+	baseFormat.At = atVal
+	baseFormat.If = ifRes
+	baseFormat.Valid = validRes
+
+	if inherited != nil {
+		return baseFormat, nil
+	}
+
+	switch baseFormat.Type {
 	case TypeMagic:
 		matchRes, err := GetKeyByIdent[Result](bin, "match", true)
 		if err != nil {
@@ -762,12 +782,31 @@ func ApplyBDF(document Result, targetFile string) ([]MetaPair, error) {
 	}
 	defer handle.Close()
 
+	typesSeq, err := GetKeyByIdent[ListResult](root, "types", false)
+	if err != nil {
+		return nil, fmt.Errorf("types: %w", err)
+	}
+
+	ns := Namespace{}
+
+	for idx, res := range typesSeq {
+		typeRes, err := ResultIs[MapResult](res)
+		if err != nil {
+			return nil, fmt.Errorf("types[%d]: %w", idx, err)
+		}
+
+		ident, err := GetEvalKeyByIdent[IdentResult](typeRes, "id", true, nil)
+		if err != nil {
+			return nil, fmt.Errorf("types[%d]: %w", idx, err)
+		}
+
+		ns[ident] = typeRes
+	}
+
 	binarySeq, err := GetKeyByIdent[ListResult](root, "binary", true)
 	if err != nil {
 		return nil, fmt.Errorf("binary: %w", err)
 	}
-
-	ns := Namespace{}
 
 	for idx, res := range binarySeq {
 		formatType, err := ParseFormatType(res, ns, nil)

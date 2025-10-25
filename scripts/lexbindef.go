@@ -15,7 +15,7 @@ type CmdArgs struct {
 	ShowHelp       bool
 }
 
-var usage string = "usage: lexbindef [-h] [-a] [definition path] [target path]"
+var usage string = "usage: lexbindef [options] [definition path] [target path]"
 
 func ShowHelp() {
 	fmt.Println(usage)
@@ -47,14 +47,12 @@ func ParseCmdArgs(args []string) CmdArgs {
 		case "-a", "--all":
 			cmd.ShowAll = true
 		default:
-			if cmd.DefinitionPath != "" {
-				if cmd.TargetPath != "" {
-					done = true
-				} else {
-					cmd.TargetPath = arg
-				}
-			} else {
+			if cmd.DefinitionPath == "" {
 				cmd.DefinitionPath = arg
+			} else if cmd.TargetPath == "" {
+				cmd.TargetPath = arg
+			} else {
+				done = true
 			}
 		}
 		argPosition += 1
