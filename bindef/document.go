@@ -80,7 +80,7 @@ type FormatType struct {
 	ArrSize      int64        // For array types, the amount of elements in the array.
 	ArrSizeIsEos bool         // For array types, whether the array spans to the end of the sequence.
 	RawArrItem   MapResult    // For array types, the format type as a result.
-	ProcArrItem  *FormatType  // For array types, the format type for each element of the array.
+	ProcArrItems []FormatType // For array types, the format types for each element of the array.
 	EnumType     TypeName     // For enum types, the underlying type of the enumeration.
 	EnumMembers  []EnumMember // For enum types, the members of the enumeration.
 }
@@ -568,6 +568,7 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 			return FormatType{}, err
 		}
 
+		baseFormat.RawFields = []MapResult{}
 		for _, field := range fields {
 			element, err := ResultIs[MapResult](field)
 			if err != nil {
@@ -847,6 +848,7 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 
 		idx := int64(0)
 
+		format.ProcArrItems = []FormatType{}
 		for format.ArrSizeIsEos || idx < format.ArrSize {
 			arrItem, err := ParseFormatType(format.RawArrItem, ns, nil)
 			if err != nil {
@@ -861,7 +863,7 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 				return nil, err
 			}
 
-			format.ProcArrItem = &arrItem
+			format.ProcArrItems = append(format.ProcArrItems, arrItem)
 
 			elements = append(elements, proc)
 			idx += 1

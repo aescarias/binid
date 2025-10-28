@@ -148,6 +148,8 @@ func ShowMetadataField(pair MetaPair, indent int, fullBytes bool) {
 		for _, field := range f.ProcFields {
 			id := IdentResult(field.Id)
 
+			// fmt.Println(field)
+
 			ShowMetadataField(
 				MetaPair{Field: field, Value: mapping[id]},
 				indent+1, fullBytes,
@@ -157,9 +159,9 @@ func ShowMetadataField(pair MetaPair, indent int, fullBytes bool) {
 		list := pair.Value.(ListResult)
 		fmt.Printf("%s%s (%d):\n", indentStr, key, len(list))
 
-		for _, field := range list {
+		for idx, field := range f.ProcArrItems {
 			ShowMetadataField(
-				MetaPair{Field: *f.ProcArrItem, Value: field},
+				MetaPair{Field: field, Value: list[idx]},
 				indent+1, fullBytes,
 			)
 		}

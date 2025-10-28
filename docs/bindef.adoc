@@ -594,7 +594,7 @@ A format type is a mapping describing a field within a structured format such as
 |(optional) Information documenting this field such as its purpose or use.
 
 |at
-|integer or list of integers
+|integer or list of [integer, string]
 |(optional) A seek position from which the field will be read.
 
 |valid
