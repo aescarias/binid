@@ -148,8 +148,6 @@ func ShowMetadataField(pair MetaPair, indent int, fullBytes bool) {
 		for _, field := range f.ProcFields {
 			id := IdentResult(field.Id)
 
-			// fmt.Println(field)
-
 			ShowMetadataField(
 				MetaPair{Field: field, Value: mapping[id]},
 				indent+1, fullBytes,

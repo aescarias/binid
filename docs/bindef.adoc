@@ -1,6 +1,6 @@
 = The BinDef Language Reference
 Ángel Carias <lotta.dev@outlook.com>
-v0.4, 2025-10-25
+v0.4, 2025-10-28
 :toc: auto
 :sectnums: |,all|
 
@@ -842,7 +842,7 @@ The `enum` type requires an additional key `members` which is a list of mappings
 
 Each enumeration member is a mapping that must contain the keys `ìd` and `value`. `id` is an identifier that will be used to refer to the constant value and `value` specifies the constant value itself. An optional field `doc` may also be used to specify a human-readable name for the enum constant.
 
-For example, the Executable and Linkable Format includes multiple integer fields that may be described as enumerations. In this case, we will describe the values of the `e_ident[E_OSABI]` field as shown below.
+For example, the Executable and Linkable Format includes multiple integer fields that may be described as enumerations. In this case, we can describe the values of the `e_ident[E_OSABI]` field as shown below.
 
 [source,javascript]
 ----

@@ -3,10 +3,10 @@
 ## Overview
 
 - [X] Block comments (`/* comment */`)
-- [ ] Enumerations
+- [X] Enumerations
 - [ ] Integer validations & conversions
 - [ ] String encodings & representations
-- [ ] Type & constant declarations
+- [X] Type & constant declarations
 - [ ] Bit fields
 - [ ] Bit-sized integers
 - [ ] Variable length integers
