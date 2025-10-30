@@ -1,6 +1,6 @@
 = The BinDef Language Reference
 Ángel Carias <lotta.dev@outlook.com>
-v0.4, 2025-10-28
+v0.5, 2025-10-29
 :toc: auto
 :sectnums: |,all|
 
@@ -555,6 +555,7 @@ The currently available types are:
 - The file signature type `magic`.
 - The unsigned integer types `uint8`, `uint16`, `uint24`, `uint32`, and `uint64`.
 - The signed integer types `int8`, `int16`, `int24`, `int32`, and `int64`.
+- The floating point types `float32` and `float64`.
 - The `byte[n]` type.
 - The `array[n]` type.
 - The `struct` type.
@@ -712,6 +713,14 @@ NOTE: uint24 and int24 were added in version 0.4
 The types `uint8`, `uint16`, `uint24`, `uint32`, and `uint64` are used for parsing unsigned integers with those bit sizes. Their signed equivalents are `int8`, `int16`, `int24`, `int32`, and `int64`.
 
 These types must contain an `endian` key specifying either the string "little" or the string "big". This tells BinDef to read the integer in little endian or big endian byte order, respectively. An exception is made for `int8` and `uint8` where specifying a byte endianness is redundant.
+
+=== Floating point types
+
+NOTE: Added in version 0.5
+
+The types `float32` and `float64` are used for parsing IEEE 754 floating point types of single precision (32 bits) and double precision (64 bits) respectively.
+
+As with integer types, floats must also contain an `endian` key specifying either `"little"` or `"big"` as its value.
 
 === The `byte[n]` type
 

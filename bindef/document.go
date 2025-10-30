@@ -460,7 +460,7 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 			}
 			return baseFormat, nil
 		}
-	case TypeUint16, TypeUint24, TypeUint32, TypeUint64, TypeInt16, TypeInt24, TypeInt32, TypeInt64:
+	case TypeUint16, TypeUint24, TypeUint32, TypeUint64, TypeInt16, TypeInt24, TypeInt32, TypeInt64, TypeFloat32, TypeFloat64:
 		endian, err := getFormatEndian(bin, base, ns)
 		if err != nil {
 			return FormatType{}, err
@@ -590,7 +590,7 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 			return FormatType{}, err
 		}
 
-		if !slices.Contains(AvailableIntegerTypes, enumType.Name) {
+		if !slices.Contains(AvailableNumericTypes, enumType.Name) {
 			return FormatType{}, fmt.Errorf("enum only supports integer types")
 		}
 
@@ -680,6 +680,35 @@ func checkMagic(handle *os.File, format FormatType) (Result, error) {
 	return nil, ErrMagic{Offset: baseOffset}
 }
 
+func readFloat(handle *os.File, format FormatType) (Result, error) {
+	var endian binary.ByteOrder
+	switch format.Endian {
+	case "little":
+		endian = binary.LittleEndian
+	case "big":
+		endian = binary.BigEndian
+	}
+
+	switch format.Type {
+	case TypeFloat32:
+		var float float32
+		if err := binary.Read(handle, endian, &float); err != nil {
+			return nil, err
+		}
+
+		return FloatResult(float64(float)), nil
+	case TypeFloat64:
+		var float float64
+		if err := binary.Read(handle, endian, &float); err != nil {
+			return nil, err
+		}
+
+		return FloatResult(float64(float)), nil
+	default:
+		return nil, fmt.Errorf("not a float")
+	}
+}
+
 func readInt(handle *os.File, format FormatType) (Result, error) {
 	var numBytes int
 	switch format.Type {
@@ -760,6 +789,14 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 		value = magic
 	case TypeUint8, TypeUint16, TypeUint24, TypeUint32, TypeUint64, TypeInt8, TypeInt16, TypeInt24, TypeInt32, TypeInt64:
 		num, err := readInt(handle, *format)
+
+		if err != nil {
+			return nil, err
+		}
+
+		value = num
+	case TypeFloat32, TypeFloat64:
+		num, err := readFloat(handle, *format)
 
 		if err != nil {
 			return nil, err
