@@ -145,7 +145,7 @@ func parseMeta(meta Result) (Meta, error) {
 	}
 
 	// media type(s)
-	mime, err := GetKeyByIdent[ListResult](metadata, "mime", true)
+	mime, err := GetKeyByIdent[ListResult](metadata, "mime", false)
 	if err != nil {
 		return Meta{}, fmt.Errorf("meta: %w", err)
 	}
@@ -162,7 +162,7 @@ func parseMeta(meta Result) (Meta, error) {
 	}
 
 	// exts
-	exts, err := GetKeyByIdent[ListResult](metadata, "exts", true)
+	exts, err := GetKeyByIdent[ListResult](metadata, "exts", false)
 	if err != nil {
 		return Meta{}, fmt.Errorf("meta: %w", err)
 	}

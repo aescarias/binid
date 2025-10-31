@@ -517,6 +517,8 @@ NOTE: The `types` key was added in version 0.4
 
 === The `meta` key
 
+NOTE: Before BinDef 0.5, the keys `mime` and `exts` were required.
+
 `meta` is a mapping containing metadata of the format being described. The keys that the `meta` mapping may contain are:
 
 [cols="1,1,2"]
@@ -533,11 +535,11 @@ NOTE: The `types` key was added in version 0.4
 
 |mime
 |list of strings
-|(required) The media or MIME types assigned to the described format. If multiple are listed, they should be listed in descending order of preference.
+|(optional) The media or MIME types assigned to the described format. If multiple are listed, they should be listed in descending order of preference.
 
 |exts
 |list of strings
-|(required) The file extensions commonly used for this format. If multiple are listed, they should be listed in descending order of preference. The extensions should contain a leading period.
+|(optional) The file extensions commonly used for this format. If multiple are listed, they should be listed in descending order of preference. The extensions should contain a leading period.
 
 |doc
 |string
