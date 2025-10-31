@@ -2,6 +2,7 @@ package bindef
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 )
 
@@ -248,4 +249,66 @@ func ResultIs[T Result](res Result) (T, error) {
 	}
 
 	return val, nil
+}
+
+// NumberResultAsInt converts a numeric result res into an int64. If res is a float,
+// the returned value is a truncated integer. If res is an integer, the returned value
+// is simply the integer. Otherwise, a value of -1 and an error is returned.
+func NumberResultAsInt(res Result) (int64, error) {
+	switch res.Kind() {
+	case ResultInt:
+		resInt, err := ResultIs[IntegerResult](res)
+		if err != nil {
+			return -1, err
+		}
+		return resInt.Int64(), nil
+	case ResultFloat:
+		resFloat, err := ResultIs[FloatResult](res)
+		if err != nil {
+			return -1, err
+		}
+		return int64(resFloat), nil
+	default:
+		return -1, fmt.Errorf("result %s is not a numeric type", res.Kind())
+	}
+}
+
+// IntegerInBounds reports whether the integer value is in bounds with the type
+// bound provided.
+func IntegerInBounds(bound TypeName, value IntegerResult) bool {
+	bigUint := func(value uint64) *big.Int {
+		return new(big.Int).SetUint64(value)
+	}
+	bigInt := func(value int64) *big.Int {
+		return new(big.Int).SetInt64(value)
+	}
+
+	intValue := value.Int
+
+	var minBound, maxBound *big.Int
+
+	switch bound {
+	case TypeUint8:
+		minBound, maxBound = bigUint(0), bigUint(0xff)
+	case TypeUint16:
+		minBound, maxBound = bigUint(0), bigUint(0xffff)
+	case TypeUint24:
+		minBound, maxBound = bigUint(0), bigUint(0xffffff)
+	case TypeUint32:
+		minBound, maxBound = bigUint(0), bigUint(math.MaxUint32)
+	case TypeUint64:
+		minBound, maxBound = bigUint(0), bigUint(math.MaxUint64)
+	case TypeInt8:
+		minBound, maxBound = bigInt(math.MinInt8), bigInt(math.MaxInt8)
+	case TypeInt16:
+		minBound, maxBound = bigInt(math.MinInt16), bigInt(math.MaxInt16)
+	case TypeInt24:
+		minBound, maxBound = bigInt(-8_388_608), bigInt(8_388_607)
+	case TypeInt32:
+		minBound, maxBound = bigInt(math.MinInt32), bigInt(math.MaxInt32)
+	case TypeInt64:
+		minBound, maxBound = bigInt(math.MinInt64), bigInt(math.MaxInt64)
+	}
+
+	return intValue.Cmp(minBound) >= 0 && intValue.Cmp(maxBound) <= 0
 }

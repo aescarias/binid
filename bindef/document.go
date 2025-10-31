@@ -17,7 +17,7 @@ import (
 )
 
 // SpecVersion is the version of the BinDef spec implemented by this runtime.
-var SpecVersion = Version{Major: 0, Minor: 1}
+var SpecVersion = Version{Major: 0, Minor: 5}
 
 // A Version describes a specification version with a major and minor version component.
 type Version struct {
@@ -70,7 +70,7 @@ type FormatType struct {
 	At           *SeekPos     // Seek position.
 	Valid        LazyResult   // Validation function.
 	If           LazyResult   // Only process value on condition.
-	Endian       string       // For integer types only, the byte endianness (either "big" or "little").
+	Endian       string       // For integer types and types that may contain them, the byte endianness (either "big" or "little").
 	Match        []MagicTag   // For magic types only, the pattern(s) that must match.
 	Size         int64        // For byte types only, the size of the byte string.
 	Strip        bool         // For byte types only, whether to strip whitespace or null bytes from the ends of the string.
@@ -94,25 +94,6 @@ type EnumMember struct {
 type MagicTag struct {
 	Contents string
 	Offset   int64
-}
-
-func NumberResultAsInt(res Result) (int64, error) {
-	switch res.Kind() {
-	case ResultInt:
-		resInt, err := ResultIs[IntegerResult](res)
-		if err != nil {
-			return -1, err
-		}
-		return resInt.Int64(), nil
-	case ResultFloat:
-		resFloat, err := ResultIs[FloatResult](res)
-		if err != nil {
-			return -1, err
-		}
-		return int64(resFloat), nil
-	default:
-		return -1, fmt.Errorf("result %s is not a numeric type", res.Kind())
-	}
 }
 
 func parseMeta(meta Result) (Meta, error) {
@@ -211,44 +192,6 @@ func getFormatEndian(bin MapResult, base MapResult, ns Namespace) (string, error
 	}
 
 	return endian, nil
-}
-
-func IntegerInBounds(bound TypeName, value IntegerResult) bool {
-	bigUint := func(value uint64) *big.Int {
-		return new(big.Int).SetUint64(value)
-	}
-	bigInt := func(value int64) *big.Int {
-		return new(big.Int).SetInt64(value)
-	}
-
-	intValue := value.Int
-
-	var minBound, maxBound *big.Int
-
-	switch bound {
-	case TypeUint8:
-		minBound, maxBound = bigUint(0), bigUint(0xff)
-	case TypeUint16:
-		minBound, maxBound = bigUint(0), bigUint(0xffff)
-	case TypeUint24:
-		minBound, maxBound = bigUint(0), bigUint(0xffffff)
-	case TypeUint32:
-		minBound, maxBound = bigUint(0), bigUint(math.MaxUint32)
-	case TypeUint64:
-		minBound, maxBound = bigUint(0), bigUint(math.MaxUint64)
-	case TypeInt8:
-		minBound, maxBound = bigInt(math.MinInt8), bigInt(math.MaxInt8)
-	case TypeInt16:
-		minBound, maxBound = bigInt(math.MinInt16), bigInt(math.MaxInt16)
-	case TypeInt24:
-		minBound, maxBound = bigInt(-8_388_608), bigInt(8_388_607)
-	case TypeInt32:
-		minBound, maxBound = bigInt(math.MinInt32), bigInt(math.MaxInt32)
-	case TypeInt64:
-		minBound, maxBound = bigInt(math.MinInt64), bigInt(math.MaxInt64)
-	}
-
-	return intValue.Cmp(minBound) >= 0 && intValue.Cmp(maxBound) <= 0
 }
 
 var ErrSkipped = fmt.Errorf("format type was skipped because condition is false")
