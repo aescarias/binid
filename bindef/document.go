@@ -714,6 +714,52 @@ type MetaPair struct {
 	Value Result
 }
 
+func parseEnumRange(bound TypeName, res MapResult) (from, to IntegerResult, err error) {
+	var zero IntegerResult
+
+	from, err = GetKeyByIdent[IntegerResult](res, "from", true)
+	if err != nil {
+		return zero, zero, err
+	}
+
+	to, err = GetKeyByIdent[IntegerResult](res, "to", true)
+	if err != nil {
+		return zero, zero, err
+	}
+
+	if !IntegerInBounds(bound, from) {
+		return zero, zero, fmt.Errorf("from value not in bounds of type")
+	} else if !IntegerInBounds(bound, to) {
+		return zero, zero, fmt.Errorf("to value not in bounds of type")
+	}
+
+	return from, to, nil
+}
+
+func valueInEnumRange(from, to IntegerResult, value Result) (bool, error) {
+	isEnumerated := false
+
+	current := IntegerResult{new(big.Int).Set(from.Int)}
+	for !isEnumerated {
+		lt, err := doBinOpLt(current, to)
+		if err != nil {
+			return false, err
+		}
+
+		if !lt {
+			break
+		}
+
+		if doBinOpEquals(value, current) {
+			isEnumerated = true
+		}
+
+		current = IntegerResult{current.Add(current.Int, big.NewInt(1))}
+	}
+
+	return isEnumerated, nil
+}
+
 func processType(handle *os.File, format *FormatType, ns Namespace) (res Result, err error) {
 	if format.At != nil {
 		if _, err := handle.Seek(format.At.Offset, format.At.Whence); err != nil {
@@ -776,15 +822,31 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 
 		isEnumerated := false
 		for _, member := range format.EnumMembers {
-			ns[IdentResult(member.Id)] = member.Value
+			switch val := member.Value.(type) {
+			case MapResult:
+				from, to, err := parseEnumRange(format.EnumType, val)
+				if err != nil {
+					return nil, fmt.Errorf("member %s: %w", member.Id, err)
+				}
 
-			if doBinOpEquals(result, member.Value) {
-				isEnumerated = true
+				if isEnumerated, err = valueInEnumRange(from, to, result); err != nil {
+					return nil, fmt.Errorf("member %s: %w", member.Id, err)
+				}
+
+				ns[IdentResult(member.Id)] = val
+			case IntegerResult:
+				ns[IdentResult(member.Id)] = val
+
+				if doBinOpEquals(result, val) {
+					isEnumerated = true
+				}
+			default:
+				return nil, fmt.Errorf("enum member %s must be an integer", member.Id)
 			}
 		}
 
 		if !isEnumerated {
-			return nil, fmt.Errorf("value %d not part of enumeration", result)
+			return nil, fmt.Errorf("%s: value %d not part of enumeration", format.Id, result)
 		}
 
 		value = result

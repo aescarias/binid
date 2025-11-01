@@ -874,6 +874,29 @@ For example, the Executable and Linkable Format includes multiple integer fields
 
 An error must be raised if the specified enum value is outside of the range of the underlying type. An error must also be raised if the processed value (the one read from the binary stream) is not part of the enumeration.
 
+==== Enumeration ranges
+
+NOTE: Added in version 0.5
+
+Enumeration ranges allow a single enum member to specify a range of values that may be assigned to it. An enum range is specified by using a mapping containing the keys `from` and `to` which both define the bounds of the range (inclusive). Of course, the `from` and `to` values are subject to the same bounds as the type.
+
+A common use case for enumeration ranges is specifying reserved or unassigned values.
+
+[source,javascript]
+----
+{
+  type: enum[uint8],
+  fields: [
+    { id: RESERVED, value: {from: 0, to: 127}, doc: "Reserved" },
+    { id: APP_1,    value: 128,                doc: "Application 1"}
+  ]
+}
+----
+
+In this example, all values between 0 and 127 (inclusive) are captured by the `RESERVED` enum member. As 128 is outside of the range, it is captured by the `APP_1` constant.
+
+When referring to the enum constant using a range, you may access the `from` and `to` keys. For example, checking whether a value is in range can be done using `value <= RESERVED.from && value <= RESERVED.to`. 
+
 === Type definitions
 
 NOTE: Added in version 0.4

@@ -165,8 +165,17 @@ func ShowMetadataField(pair MetaPair, indent int, fullBytes bool) {
 		}
 	case TypeEnum:
 		var friendlyName string
+
+		found := false
 		for _, member := range f.EnumMembers {
-			if doBinOpEquals(member.Value, pair.Value) {
+			if mapRes, ok := member.Value.(MapResult); ok {
+				from, to, _ := parseEnumRange(f.EnumType, mapRes)
+				found, _ = valueInEnumRange(from, to, pair.Value)
+			} else if doBinOpEquals(member.Value, pair.Value) {
+				found = true
+			}
+
+			if found {
 				if member.Doc != "" {
 					friendlyName = member.Doc
 				} else {
