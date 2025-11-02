@@ -147,6 +147,9 @@ func ShowMetadataField(pair MetaPair, indent int, fullBytes bool) {
 		fmt.Printf("%s%s:\n", indentStr, key)
 		for _, field := range f.ProcFields {
 			id := IdentResult(field.Id)
+			if id == "" {
+				continue
+			}
 
 			ShowMetadataField(
 				MetaPair{Field: field, Value: mapping[id]},

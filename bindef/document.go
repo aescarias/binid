@@ -64,6 +64,7 @@ type SeekPos struct {
 
 type FormatType struct {
 	Type         TypeName     // Format type (e.g. uint8, int8). May be more complex such as byte[n].
+	Switch       SwitchStmt   // Switch statement that produced this format type.
 	Id           string       // Field identifier.
 	Name         string       // Human-readable field name.
 	Doc          string       // Documentation.
@@ -194,6 +195,75 @@ func getFormatEndian(bin MapResult, base MapResult, ns Namespace) (string, error
 	return endian, nil
 }
 
+type SwitchStmt struct {
+	On       Result    // Expression that is matched with the cases.
+	Cases    MapResult // Cases to be matched.
+	Default  Result    // Default case if none of the cases match.
+	Selected Result    // The case that was matched.
+}
+
+func processSwitch(format MapResult, ns Namespace) (SwitchStmt, error) {
+	var empty SwitchStmt
+	var selected Result
+
+	switchRes, err := GetKeyByIdent[LazyResult](format, "switch", false)
+	if err != nil {
+		return empty, err
+	}
+
+	if switchRes == nil {
+		return empty, nil
+	}
+
+	casesRes, err := GetKeyByIdent[MapResult](format, "cases", true)
+	if err != nil {
+		return empty, err
+	}
+
+	defaultRes, err := GetEvalKeyByIdent[MapResult](format, "default", false, ns)
+	if err != nil {
+		return empty, err
+	}
+
+	switchOn, err := switchRes(ns)
+	if err != nil {
+		return empty, err
+	}
+
+	matched := false
+	for cond, res := range casesRes {
+		var evalCond Result
+		switch c := cond.(type) {
+		case LazyResult:
+			if evalCond, err = c(ns); err != nil {
+				return empty, err
+			}
+		default:
+			evalCond = c
+		}
+
+		if doBinOpEquals(switchOn, evalCond) {
+			if selected, err = EvalResultIs[MapResult](res, ns); err != nil {
+				return empty, err
+			}
+
+			matched = true
+			break
+		}
+	}
+
+	stmt := SwitchStmt{On: switchRes, Cases: casesRes, Default: defaultRes}
+	if matched {
+		stmt.Selected = selected
+	} else if stmt.Default != nil {
+		stmt.Selected = stmt.Default
+	} else {
+		return empty, fmt.Errorf("switch condition did not match any case")
+	}
+
+	return stmt, nil
+}
+
 var ErrSkipped = fmt.Errorf("format type was skipped because condition is false")
 
 func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, error) {
@@ -220,6 +290,18 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 
 		if !willParse {
 			return FormatType{}, ErrSkipped
+		}
+	}
+
+	switcher, err := processSwitch(bin, ns)
+	if err != nil {
+		return FormatType{}, err
+	}
+
+	if switcher.Selected != nil {
+		var ok bool
+		if bin, ok = switcher.Selected.(MapResult); !ok {
+			return FormatType{}, fmt.Errorf("result from switch must be a valid format type")
 		}
 	}
 
@@ -368,6 +450,7 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 	baseFormat.At = atVal
 	baseFormat.If = ifRes
 	baseFormat.Valid = validRes
+	baseFormat.Switch = switcher
 
 	if inherited != nil {
 		return baseFormat, nil

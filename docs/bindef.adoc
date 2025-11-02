@@ -1,6 +1,6 @@
 = The BinDef Language Reference
 Ángel Carias <lotta.dev@outlook.com>
-v0.5, 2025-10-29
+v0.5, 2025-11-02
 :toc: auto
 :sectnums: |,all|
 
@@ -32,7 +32,7 @@ Line comments start with `//` and extend to the end of line.
 }
 ----
 
-NOTE: Added in version 0.2
+NOTE: Block comments were added in version 0.2
 
 Block comments start with `/*` and extend to the end of the first `*/` found. Block comments can hence span multiple lines and occur anywhere within a BinDef document.
 
@@ -330,7 +330,7 @@ If `a` and `b` are numeric types, `a * b` returns the product of a and b.
 -3 * 2   // -6
 ----
 
-NOTE: Added in version 0.3
+NOTE: String repetition was added in version 0.3
 
 If `a` is a non-negative integer and `b` is a string, or vice versa, `a * b` produces the concatenation of `a` to itself `b` times.
 
@@ -550,7 +550,7 @@ NOTE: Before BinDef 0.5, the keys `mime` and `exts` were required.
 
 `binary` is a list of mappings describing the format structure.
 
-Each mapping in the `binary` list is a _format type_. All format types must contain the `type` key whose value is an identifier for a type.
+Each mapping in the `binary` list is a _format type_ or a _statement_ producing a format type. All format types must contain the `type` key whose value is an identifier for a type.
 
 The currently available types are:
 
@@ -609,7 +609,7 @@ A format type is a mapping describing a field within a structured format such as
 |(optional) A condition for parsing the field. If the condition is met, the field will be parsed; otherwise, it will be skipped.
 |====
 
-NOTE: For BinDef version 0.4 and later, additional considerations apply for format types that appear as type definitions. See <<Type definitions>> for details.
+NOTE: For BinDef versions 0.4 and later, additional considerations apply for format types that appear as type definitions. See <<Type definitions>> for details.
 
 All format types must have a `type` key with an identifier for the format type being used. This also determines whether additional keys may be specified.
 
@@ -904,6 +904,33 @@ NOTE: Added in version 0.4
 Type definitions allow BinDef authors to separate type structures from the `binary` key making the binary sequence more concise. Type definitions must appear in a separate `types` key within the root of the document.
 
 The structure of a type definition is the same as a format type. However, in type definitions, the `id` key is required as it will be used as the identifier to refer to this type. It is recommended that the keys `at`, `valid`, and `if` do not appear in the root format type.
+
+== Statements
+
+NOTE: Added in BinDef 0.5
+
+Statements are mappings that produce a result, usually a format type. Currently, only one statement is available: the `switch` statement.
+
+=== The `switch` statement.
+
+A switch statement produces a result based on a condition and a set of cases. Once the switch condition is evaluated, it is checked with every case specified. If a match is found, it evaluates and returns the type contained in the case; otherwise, if no matches occur, the "default" case is returned if it is present or an error is raised.
+
+The structure of a switch statement is as follows:
+
+[source,javascript]
+----
+{
+  switch: expression,
+  cases: {
+    case1: expr,
+    case2: expr,
+    /* ... */
+  },
+  default: baseCase,  // optional
+}
+----
+
+As seen above, the switch expression is contained in the `switch` key of the mapping. The `cases` key specifies a mapping of cases that will be matched against the expression.  The `default` key may optionally specify a default expression in the event that none of the cases are matched.
 
 == Versioning
 
