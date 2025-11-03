@@ -77,9 +77,10 @@ type FormatType struct {
 	Strip        bool         // For byte types only, whether to strip whitespace or null bytes from the ends of the string.
 	RawFields    []MapResult  // For structures only, the fields contained in the struct.
 	ProcFields   []FormatType // For structures only, the fields contained in the struct as format types.
-	VarValue     LazyResult   // For variable definitions, the value contained.
+	VarValue     Result       // For variable definitions, the value contained.
 	ArrSize      int64        // For array types, the amount of elements in the array.
 	ArrSizeIsEos bool         // For array types, whether the array spans to the end of the sequence.
+	While        Result       // For array types with length of eos, process items while condition.
 	RawArrItem   MapResult    // For array types, the format type as a result.
 	ProcArrItems []FormatType // For array types, the format types for each element of the array.
 	EnumType     TypeName     // For enum types, the underlying type of the enumeration.
@@ -495,7 +496,7 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 		baseFormat.Endian = endian
 		return baseFormat, nil
 	case TypeVar:
-		contents, err := GetKeyByIdent[LazyResult](bin, "value", true)
+		contents, err := GetKeyByIdent[Result](bin, "value", true)
 		if err != nil {
 			return FormatType{}, err
 		}
@@ -579,6 +580,15 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 			if baseFormat.ArrSize < 0 {
 				return FormatType{}, fmt.Errorf("array length must be non-negative")
 			}
+		}
+
+		if baseFormat.ArrSizeIsEos {
+			whileRes, err := GetKeyByIdent[Result](bin, "while", false)
+			if err != nil {
+				return FormatType{}, err
+			}
+
+			baseFormat.While = whileRes
 		}
 
 		baseFormat.RawArrItem = item
@@ -850,6 +860,18 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 		}
 	}
 
+	procFile, ok := ns[IdentResult("file")].(MapResult)
+	if !ok {
+		return nil, fmt.Errorf("cannot assign to 'file'")
+	}
+
+	current, err := handle.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, err
+	}
+
+	procFile[IdentResult("pos")] = IntegerResult{new(big.Int).SetInt64(current)}
+
 	var value Result
 	switch format.Type {
 	case TypeMagic:
@@ -876,12 +898,16 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 
 		value = num
 	case TypeVar:
-		res, err := format.VarValue(ns)
-		if err != nil {
-			return nil, err
+		switch variable := format.VarValue.(type) {
+		case LazyResult:
+			evalRes, err := variable(ns)
+			if err != nil {
+				return nil, err
+			}
+			value = evalRes
+		default:
+			value = variable
 		}
-
-		value = res
 	case TypeByte:
 		byteSlice := make([]byte, format.Size)
 		if _, err := handle.Read(byteSlice); err != nil {
@@ -975,6 +1001,22 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 
 		format.ProcArrItems = []FormatType{}
 		for format.ArrSizeIsEos || idx < format.ArrSize {
+			if format.ArrSizeIsEos && format.While != nil {
+				var evalWhile Result
+				switch while := format.While.(type) {
+				case LazyResult:
+					if evalWhile, err = while(ns); err != nil {
+						return nil, err
+					}
+				default:
+					evalWhile = while
+				}
+
+				if !ResultAsBoolean(evalWhile) {
+					break
+				}
+			}
+
 			arrItem, err := ParseFormatType(format.RawArrItem, ns, nil)
 			if err != nil {
 				return nil, err
@@ -1019,6 +1061,13 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 		}
 	}
 
+	current, err = handle.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, err
+	}
+
+	procFile[IdentResult("pos")] = IntegerResult{new(big.Int).SetInt64(current)}
+
 	return value, nil
 }
 
@@ -1041,7 +1090,11 @@ func ApplyBDF(document Result, targetFile string) ([]MetaPair, error) {
 		return nil, fmt.Errorf("types: %w", err)
 	}
 
-	ns := Namespace{}
+	ns := Namespace{
+		IdentResult("file"): MapResult{
+			IdentResult("pos"): IntegerResult{new(big.Int).SetInt64(0)},
+		},
+	}
 
 	for idx, res := range typesSeq {
 		typeRes, err := ResultIs[MapResult](res)

@@ -824,7 +824,7 @@ Most binary formats do not store a single record or element, but rather a collec
 
 The `array` type requires a type parameter `n` specifying the size of the array. A field using the `array` type requires an additional key `item` specifying the field to be processed `n` times.
 
-If an array is known to extend to the end of the binary sequence, the special identifier `eos` may be specified.
+If an array is known to extend to the end of the binary sequence (or while a condition is being met, see below), the special identifier `eos` may be specified.
 
 For example, many binary format are conformed of chunks with a type, length, and value, that extend to the end of the file. The following shows how parsing such format can be done:
 
@@ -842,6 +842,36 @@ For example, many binary format are conformed of chunks with a type, length, and
   }
 }
 ----
+
+==== The `while` statement
+
+NOTE: Added in version 0.5
+
+Arrays with a dynamic size may specify a `while` key including a condition that must be met while processing the array items. The `while` condition is evaluated before parsing the array item. If the condition is met, another array item is processed; otherwise, if the condition is no longer met, no more items are processed.
+
+One case where `while` can be used is when reading an arbitrary amount of elements given a maximum length. This example defines the "LIST" chunk of a .wav file with a case for handling LIST "INFO" chunks. As only the length is given and not the amount of elements in the INFO chunk, we can keep track of the file position before reading the chunk data, and then using a while condition, check that the file position doesn't exceed the offset that we defined in the `_end` variable.
+
+[source,javascript]
+----
+{ id: ListChunk, type: struct, endian: "little",
+  fields: [        
+    { type: uint32,  id: length },
+
+    { type: var,     id: _end, value: file.pos + length },
+
+    { type: byte[4], id: type },
+    { switch: type,
+      cases: {
+        "INFO": { while: file.pos < _end,
+                  type: array[eos], id: data, item: { type: InfoListChunk } }
+      },
+      default: { type: byte[length], id: data },
+    }
+  ]
+},
+----
+
+The purpose of `file.pos` is explained in <<Builtins>>.
 
 === The `enum` type
 
@@ -931,6 +961,14 @@ The structure of a switch statement is as follows:
 ----
 
 As seen above, the switch expression is contained in the `switch` key of the mapping. The `cases` key specifies a mapping of cases that will be matched against the expression.  The `default` key may optionally specify a default expression in the event that none of the cases are matched.
+
+== Builtins
+
+NOTE: Added in version 0.5
+
+Builtins are globally available methods or variables that contain information about the file context as well as utilities that operate on top of that context. Currently, only one builtin is defined: `file.pos`.
+
+The `file` variable is a mapping containing as of now a single key `pos` which defines the current byte offset in the file.
 
 == Versioning
 
