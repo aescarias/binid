@@ -90,6 +90,7 @@ type FormatType struct {
 type EnumMember struct {
 	Id    string // The enum constant identifier.
 	Value Result // The value of the enum constant.
+	Name  string // Human-readable enum constant name.
 	Doc   string // Details about the enum constant.
 }
 
@@ -659,6 +660,11 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 				return FormatType{}, err
 			}
 
+			name, err := GetKeyByIdent[StringResult](element, "name", false)
+			if err != nil {
+				return FormatType{}, err
+			}
+
 			doc, err := GetKeyByIdent[StringResult](element, "doc", false)
 			if err != nil {
 				return FormatType{}, err
@@ -671,6 +677,7 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 			baseFormat.EnumMembers = append(baseFormat.EnumMembers, EnumMember{
 				Id:    string(ident),
 				Value: value,
+				Name:  string(name),
 				Doc:   string(doc),
 			})
 		}
