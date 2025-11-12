@@ -70,6 +70,7 @@ type FormatType struct {
 	Doc          string       // Documentation.
 	At           *SeekPos     // Seek position.
 	Valid        LazyResult   // Validation function.
+	Magic        LazyResult   // Magic assertion.
 	If           LazyResult   // Only process value on condition.
 	Endian       string       // For integer types and types that may contain them, the byte endianness (either "big" or "little").
 	Match        []MagicTag   // For magic types only, the pattern(s) that must match.
@@ -439,6 +440,11 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 		return FormatType{}, err
 	}
 
+	magicRes, err := GetKeyByIdent[LazyResult](bin, "magic", false)
+	if err != nil {
+		return FormatType{}, err
+	}
+
 	var baseFormat FormatType
 	if inherited != nil {
 		baseFormat = FormatType(*inherited)
@@ -452,6 +458,7 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 	baseFormat.At = atVal
 	baseFormat.If = ifRes
 	baseFormat.Valid = validRes
+	baseFormat.Magic = magicRes
 	baseFormat.Switch = switcher
 
 	if inherited != nil {
@@ -459,35 +466,6 @@ func ParseFormatType(format Result, ns Namespace, base MapResult) (FormatType, e
 	}
 
 	switch baseFormat.Type {
-	case TypeMagic:
-		matchRes, err := GetKeyByIdent[Result](bin, "match", true)
-		if err != nil {
-			return FormatType{}, err
-		}
-
-		switch matchRes.Kind() {
-		case ResultString:
-			baseFormat.Match = []MagicTag{
-				{
-					Contents: string(matchRes.(StringResult)),
-					Offset:   0,
-				},
-			}
-			return baseFormat, nil
-		case ResultList:
-			for idx, res := range matchRes.(ListResult) {
-				matchStr, err := ResultIs[StringResult](res)
-				if err != nil {
-					return FormatType{}, fmt.Errorf("%d: %w", idx, err)
-				}
-
-				baseFormat.Match = append(baseFormat.Match, MagicTag{
-					Contents: string(matchStr),
-					Offset:   0,
-				})
-			}
-			return baseFormat, nil
-		}
 	case TypeUint16, TypeUint24, TypeUint32, TypeUint64, TypeInt16, TypeInt24, TypeInt32, TypeInt64, TypeFloat32, TypeFloat64:
 		endian, err := getFormatEndian(bin, base, ns)
 		if err != nil {
@@ -697,32 +675,6 @@ func (e ErrMagic) Error() string {
 	return fmt.Sprintf("did not find magic at offset %d", e.Offset)
 }
 
-func checkMagic(handle *os.File, format FormatType) (Result, error) {
-	baseOffset, err := handle.Seek(0, io.SeekCurrent)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, tag := range format.Match {
-		if _, err := handle.Seek(baseOffset+tag.Offset, io.SeekStart); err != nil {
-			return nil, err
-		}
-
-		contents := []byte(tag.Contents)
-
-		matchBytes := make([]byte, len(contents))
-		if _, err := handle.Read(matchBytes); err != nil {
-			return nil, err
-		}
-
-		if slices.Equal(matchBytes, contents) {
-			return StringResult(contents), nil
-		}
-	}
-
-	return nil, ErrMagic{Offset: baseOffset}
-}
-
 func readFloat(handle *os.File, format FormatType) (Result, error) {
 	var endian binary.ByteOrder
 	switch format.Endian {
@@ -881,13 +833,6 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 
 	var value Result
 	switch format.Type {
-	case TypeMagic:
-		magic, err := checkMagic(handle, *format)
-		if err != nil {
-			return nil, err
-		}
-
-		value = magic
 	case TypeUint8, TypeUint16, TypeUint24, TypeUint32, TypeUint64, TypeInt8, TypeInt16, TypeInt24, TypeInt32, TypeInt64:
 		num, err := readInt(handle, *format)
 
@@ -1052,8 +997,12 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 		ns[IdentResult(format.Id)] = value
 	}
 
+	assertNs := Namespace{}
+	maps.Copy(assertNs, ns)
+	assertNs[IdentResult("_")] = value
+
 	if format.Valid != nil {
-		isValidRes, err := format.Valid(ns)
+		isValidRes, err := format.Valid(assertNs)
 		if err != nil {
 			return nil, err
 		}
@@ -1065,6 +1014,22 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 
 		if !isValid {
 			return nil, fmt.Errorf("value for %q is invalid (has value %v)", format.Id, value)
+		}
+	}
+
+	if format.Magic != nil {
+		isMagicRes, err := format.Magic(assertNs)
+		if err != nil {
+			return nil, err
+		}
+
+		isMagic, err := ResultIs[BooleanResult](isMagicRes)
+		if err != nil {
+			return nil, err
+		}
+
+		if !isMagic {
+			return nil, ErrMagic{Offset: current}
 		}
 	}
 

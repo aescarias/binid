@@ -128,8 +128,6 @@ func ShowMetadataField(pair MetaPair, indent int, fullBytes bool) {
 	}
 
 	switch f := pair.Field; f.Type {
-	case TypeMagic:
-		return
 	case TypeByte:
 		str := string(pair.Value.(StringResult))
 

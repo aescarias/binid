@@ -80,7 +80,6 @@ type TypeResult struct {
 type TypeName string
 
 const (
-	TypeMagic   TypeName = "magic"
 	TypeBool    TypeName = "bool"
 	TypeByte    TypeName = "byte"
 	TypeStruct  TypeName = "struct"
@@ -104,7 +103,7 @@ const (
 func (tr TypeResult) Kind() ResultKind { return ResultType }
 
 var AvailableTypeNames = []TypeName{
-	TypeMagic, TypeBool, TypeByte, TypeStruct, TypeArray, TypeVar, TypeEnum,
+	TypeBool, TypeByte, TypeStruct, TypeArray, TypeVar, TypeEnum,
 	TypeUint8, TypeUint16, TypeUint24, TypeUint32, TypeUint64,
 	TypeInt8, TypeInt16, TypeInt24, TypeInt32, TypeInt64,
 	TypeFloat32, TypeFloat64,

@@ -1,6 +1,6 @@
 = The BinDef Language Reference
 Ángel Carias <lotta.dev@outlook.com>
-v0.5, 2025-11-02
+v0.5, 2025-11-11
 :toc: auto
 :sectnums: |,all|
 
@@ -554,7 +554,6 @@ Each mapping in the `binary` list is a _format type_ or a _statement_ producing 
 
 The currently available types are:
 
-- The file signature type `magic`.
 - The unsigned integer types `uint8`, `uint16`, `uint24`, `uint32`, and `uint64`.
 - The signed integer types `int8`, `int16`, `int24`, `int32`, and `int64`.
 - The floating point types `float32` and `float64`.
@@ -636,9 +635,15 @@ If the `at` key is not specified, the position from which the field will be read
 
 `{at: 0}` implies `{at: [0, "current"]}`.
 
-=== Validations
+=== Assertions
 
-In many cases, the values of a field are known and expected to be in a set range. To ensure that this is the case when processing the field, BinDef provides the `valid` key which contains a lazily-evaluated expression that returns a boolean determining whether the value contained in the field is correct.
+In many cases, the values of a field are known and expected to be in a set range. To ensure that this is the case when processing the field, BinDef provides *assertions* which allow you to assert that a field matches a condition.
+
+BinDef provides two types of assertions: `valid` assertions and `magic` assertions.
+
+==== `valid` assertions
+
+`valid` assertions are the standard form of assertion and are specified using the `valid` key. Its value shall be a lazily-evaluated expression that returns a boolean determining whether the value contained in the field is correct.
 
 If the expression evaluates to false, then a BinDef runtime should stop parsing the document and should raise an error.
 
@@ -655,6 +660,52 @@ A common use case for `valid` is checking if the binary format being parsed conf
 ----
 
 In this case, the `version` field must be 1; otherwise, parsing is stopped.
+
+The variable containing the valid assertion can be referred to explicitly by name or by using the `_` identifier. For example:
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: uint8, id: version, valid: _ == 1 }
+  ]
+}
+----
+
+NOTE: Usage of the `_` identifier in the above context was added in BinDef 0.5
+
+==== `magic` assertions
+
+NOTE: Before BinDef 0.5, magic assertions were covered by a special `magic` type. This type has been removed in version 0.5.
+
+`magic` assertions provide a special mechanism to match file signatures or https://en.wikipedia.org/wiki/File_format#Magic_number[magic numbers]. The difference with these assertions and `valid` assertions is that they are expected to be treated differently by a BinDef runtime on error. For instance, the reference BinDef runtime returns a different error depending on whether a magic assertion or a valid assertion failed.
+
+The following example shows a magic assertion for the signature of a ZIP file format (in this case, the value `PK\x03\x04` at position 0).
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: byte[4], magic: _ == "PK\x03\x04" }
+  ]
+}
+----
+
+The GIF format uses two magic numbers depending on the version: `GIF87a` and `GIF89a`. An assertion matching those values would be:
+
+[source,javascript]
+----
+{
+  meta: {},
+  binary: [
+    { type: byte[6], magic: _ == "GIF87a" || _ == "GIF89a" }
+  ]
+}
+----
+
+As with valid assertions, the `_` identifier can be used to refer to the parsed value.
 
 === Conditional fields
 
@@ -677,36 +728,6 @@ It is possible that a field may only appear if a certain condition is met. For e
 Here, `version` being 1 determines whether `timestamp` is parsed before `code` or whether `code` is the next field in the sequence. 
 
 It is worth noting that the `if` condition is checked before processing any other fields, so if the condition is not met, no seek operations or identifier declarations will occur.
-
-=== The `magic` type
-
-The `magic` type provides a simple way to match file signatures or https://en.wikipedia.org/wiki/File_format#Magic_number[magic numbers]. If the contents specified in the magic type are not matched, then it is safe to assume that the definition will not successfully parse the format.
-
-Alongside the common format type keys, the `magic` type requires an additional `match` key. The `match` key may be either a string including the content to match or a list of strings to match where, if one match fails, the next string is matched until either all strings are exhausted or one of the strings is matched successfully.
-
-For example, this would attempt to match the value `PK\x03\x04` (magic number for the ZIP file format) at position 0.
-
-[source,javascript]
-----
-{
-  meta: {},
-  binary: [
-    { type: magic, match: "PK\x03\x04" }
-  ]
-}
-----
-
-The GIF format uses two magic numbers depending on the version: `GIF87a` and `GIF89a`. A type matching those values would be:
-
-[source,javascript]
-----
-{
-  meta: {},
-  binary: [
-    { type: magic, match: ["GIF87a", "GIF89a"] }
-  ]
-}
-----
 
 === Unsigned & signed integer types
 
