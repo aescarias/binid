@@ -987,9 +987,58 @@ As seen above, the switch expression is contained in the `switch` key of the map
 
 NOTE: Added in version 0.5
 
-Builtins are globally available methods or variables that contain information about the file context as well as utilities that operate on top of that context. Currently, only one builtin is defined: `file.pos`.
+Builtins are globally available methods or variables that contain information about the file context as well as utilities that operate on top of that context.
 
-The `file` variable is a mapping containing as of now a single key `pos` which defines the current byte offset in the file.
+The following builtins are defined:
+
+- `filepos`
+- `slice(collection, start, end)`
+- `has(collection, element)`
+- `len(collection)`
+- `ceil(value)`
+- `floor(value)`
+- `abs(value)`
+- `parseInt(string)`
+
+=== filepos
+
+`filepos` is an integer specifying the current byte offset in the file. 
+
+=== slice(collection, start, end)
+
+`slice` returns a subslice of `collection` from index `start` up to index `end`.
+
+`collection` must be either a string or a list. `start` and `end` must be integers.
+
+=== has(collection, element)
+
+`has` reports whether `element` is part of `collection`.
+
+`collection` must be a list. `element` may be any valid type.
+
+=== len(collection)
+
+`len` determines the length of `collection`.
+
+- If `collection` is a string, `len` returns the number of bytes in the string.
+- If `collection` is a mapping, `len` returns the number of keys in the mapping.
+- If `collection` is a list, `len` returns the number of elements in the list.
+
+=== ceil(value)
+
+`ceil` returns the ceiling of `value`. `value` must be numeric (either an integer or a float).
+
+=== floor(value)
+
+`floor` returns the floor of `value`. `value` must be numeric (either an integer or a float).
+
+=== abs(value)
+
+`abs` returns the absolute value of `value`. `value` must be numeric (either an integer or a float).
+
+=== parseInt(value)
+
+`parseInt` converts a string `value` into an integer. The entire string must be composed of digits 0 through 9. The string will be interpreted as a base 10 integer.
 
 == Versioning
 

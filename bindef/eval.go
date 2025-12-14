@@ -711,6 +711,44 @@ func EvaluateTernary(node TernaryNode, namespace Namespace) (Result, error) {
 	return Evaluate(node.Else, namespace)
 }
 
+func EvaluateCall(node CallNode, namespace Namespace) (Result, error) {
+	args := []Result{}
+	for _, arg := range node.Arguments {
+		argRes, err := Evaluate(arg, namespace)
+		if err != nil {
+			return nil, err
+		}
+
+		args = append(args, argRes)
+	}
+
+	funcNs := Namespace{
+		IdentResult("ceil"):     buildCeilFn(node, args),
+		IdentResult("floor"):    buildFloorFn(node, args),
+		IdentResult("abs"):      buildAbsFn(node, args),
+		IdentResult("len"):      buildLenFn(node, args),
+		IdentResult("slice"):    buildSliceFn(node, args),
+		IdentResult("has"):      buildHasFn(node, args),
+		IdentResult("parseInt"): buildParseIntFn(node, args),
+	}
+	maps.Copy(funcNs, namespace)
+
+	expr, err := Evaluate(node.Expr, funcNs)
+	if err != nil {
+		return nil, err
+	}
+
+	if call, ok := expr.(LazyResult); ok {
+		return call(namespace)
+	} else {
+		return nil, LangError{
+			ErrorType,
+			node.Position(),
+			fmt.Sprintf("object of type %s is not callable", expr.Kind()),
+		}
+	}
+}
+
 func EvaluateAttr(node AttrNode, namespace Namespace) (Result, error) {
 	expr, err := Evaluate(node.Expr, namespace)
 	if err != nil {
@@ -765,6 +803,8 @@ func Evaluate(tree Node, namespace Namespace) (Result, error) {
 		return EvaluateMap(*tree.(*MapNode), namespace)
 	case NodeAttr:
 		return EvaluateAttr(*tree.(*AttrNode), namespace)
+	case NodeCall:
+		return EvaluateCall(*tree.(*CallNode), namespace)
 	case NodeList:
 		return EvaluateList(*tree.(*ListNode), namespace)
 	case NodeSubscript:

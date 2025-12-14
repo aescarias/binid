@@ -819,17 +819,12 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 		}
 	}
 
-	procFile, ok := ns[IdentResult("file")].(MapResult)
-	if !ok {
-		return nil, fmt.Errorf("cannot assign to 'file'")
-	}
-
 	current, err := handle.Seek(0, io.SeekCurrent)
 	if err != nil {
 		return nil, err
 	}
 
-	procFile[IdentResult("pos")] = IntegerResult{new(big.Int).SetInt64(current)}
+	ns[IdentResult("filepos")] = IntegerResult{new(big.Int).SetInt64(current)}
 
 	var value Result
 	switch format.Type {
@@ -1038,7 +1033,7 @@ func processType(handle *os.File, format *FormatType, ns Namespace) (res Result,
 		return nil, err
 	}
 
-	procFile[IdentResult("pos")] = IntegerResult{new(big.Int).SetInt64(current)}
+	ns[IdentResult("filepos")] = IntegerResult{new(big.Int).SetInt64(current)}
 
 	return value, nil
 }
@@ -1063,9 +1058,7 @@ func ApplyBDF(document Result, targetFile string) ([]MetaPair, error) {
 	}
 
 	ns := Namespace{
-		IdentResult("file"): MapResult{
-			IdentResult("pos"): IntegerResult{new(big.Int).SetInt64(0)},
-		},
+		IdentResult("filepos"): IntegerResult{new(big.Int).SetInt64(0)},
 	}
 
 	for idx, res := range typesSeq {
