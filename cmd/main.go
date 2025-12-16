@@ -12,7 +12,7 @@ import (
 	"github.com/aescarias/binid/bindef"
 )
 
-var VERSION = "0.5.0"
+var VERSION = "0.6.0"
 
 func ParseDef(filepath string) bindef.Result {
 	bdfData, err := os.ReadFile(filepath)
