@@ -21,7 +21,8 @@ BinID will attempt to load definitions from the `formats` folder in the director
 If BinID is able to identify a format, it will print information such as the example below:
 
 ```plaintext
-found 33 definition(s)
+found 53 definition(s)
+matching toybox-x86_64.elf
 
 == match
 name: Executable and Linkable Format
@@ -29,11 +30,16 @@ mime(s): application/x-executable
 details: The Executable and Linkable Format (ELF) is a common standard file format used for executable files and shared libraries. It is the standard executable file format among Unix-likes.
 
 == metadata
-Class: 2
-Endianness: 1
-Version: 1
-Target ABI: 0
-Target ABI version: 0
+ELF Header:
+  Class: 64-bit (0x2)
+  Endianness: Little-endian (0x1)
+  Version: 1
+  Target ABI: System V (0x0)
+  Target ABI version: 0
+  Object file type: Executable (0x2)
+  Target ISA: AMD x86-64 architecture (0x3e)
+  Entry point address: 4194694
+  [...]
 ```
 
-For certain byte sequences, the information will be stripped after 256 characters. Specifying the `-a` option will print the entire byte sequence, though note that this can produce fairly large outputs.
+By default, byte sequences with more than 256 characters will be stripped. Specifying the `-a` option will print the entire byte sequence, though note that this can produce fairly large outputs.
