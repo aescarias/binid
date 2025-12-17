@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/aescarias/binid/bindef"
+	"github.com/aescarias/bindef/bindef"
 )
 
 type CmdArgs struct {
