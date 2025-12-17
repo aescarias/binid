@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/aescarias/bindef"
+	"github.com/aescarias/bindef/bindef"
 )
 
 var VERSION = "0.6.0"

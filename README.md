@@ -2,7 +2,7 @@
 
 BinID (Binary Identifier) is a tool for identifying and extracting the contents of a file.
 
-BinID identifies files by relying on binary definition files written in a declarative language called [BinDef](./docs/bindef.adoc). Each definition describes a particular file format's features (e.g. magic numbers or signatures, headers, etc) and is compared with the input file. If a match is found, BinID will display details of the matched format plus file metadata.
+BinID identifies files by relying on binary definition files written in a declarative language called [BinDef](https://github.com/aescarias/bindef/blob/main/docs/bindef.adoc). Each definition describes a particular file format's features (e.g. magic numbers or signatures, headers, etc) and is compared with the input file. If a match is found, BinID will display details of the matched format plus file metadata.
 
 BinID can be useful for finding software that can read a particular file, performing data recovery, reverse engineering or parsing a file, and more.
 
